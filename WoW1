@@ -1,0 +1,89 @@
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+--// Settings
+local lockEnabled = true
+local currentTarget = nil
+
+--// GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Main draggable frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 150, 0, 50)
+mainFrame.Position = UDim2.new(0.7, 0, 0.05, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(1, 0, 1, 0)
+toggleButton.Text = "Lock Target: ✔️"
+toggleButton.TextColor3 = Color3.fromRGB(255,255,255)
+toggleButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+toggleButton.Parent = mainFrame
+
+toggleButton.MouseButton1Click:Connect(function()
+    lockEnabled = not lockEnabled
+    toggleButton.Text = lockEnabled and "Lock Target: ✔️" or "Lock Target: ❌"
+    currentTarget = nil -- Reset target when disabled
+end)
+
+--// Function to check visibility
+local function isVisible(target)
+    if not target:FindFirstChild("HumanoidRootPart") then return false end
+    local origin = camera.CFrame.Position
+    local direction = (target.HumanoidRootPart.Position - origin).Unit * 1000
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {player.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local ray = Workspace:Raycast(origin, direction, raycastParams)
+    
+    if ray then
+        return ray.Instance:IsDescendantOf(target)
+    end
+    return false
+end
+
+--// Lock target update
+RunService.RenderStepped:Connect(function()
+    if not lockEnabled then
+        currentTarget = nil
+        return
+    end
+
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            -- ตรวจสอบว่าเป็นศัตรู
+            if p.Team ~= player.Team and isVisible(p.Character) then
+                local distance = (camera.CFrame.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestEnemy = p.Character
+                end
+            end
+        end
+    end
+
+    currentTarget = closestEnemy
+
+    -- สำหรับทดสอบ: วาดตัวชี้เล็ก ๆ บนเป้าหมาย
+    if currentTarget then
+        local pos, onScreen = camera:WorldToViewportPoint(currentTarget.HumanoidRootPart.Position)
+        if onScreen then
+            -- ตัวอย่าง: คุณสามารถใช้ GUI หรือการหมุนปืนไปที่ currentTarget
+        end
+    end
+end)
