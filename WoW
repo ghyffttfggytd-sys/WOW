@@ -1,0 +1,97 @@
+-- 🏃 เมนูวิ่งไว (ใช้ได้ทั้งมือถือและคอม)
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+-- สร้าง GUI หลัก
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SpeedMenu"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+-- ปุ่มเปิดเมนู (ลอยขวาบน)
+local OpenButton = Instance.new("TextButton")
+OpenButton.Name = "OpenButton"
+OpenButton.Size = UDim2.new(0, 100, 0, 40)
+OpenButton.Position = UDim2.new(1, -110, 0, 10)
+OpenButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+OpenButton.Text = "เมนู"
+OpenButton.TextColor3 = Color3.new(1, 1, 1)
+OpenButton.TextScaled = true
+OpenButton.Parent = ScreenGui
+
+-- กรอบเมนู
+local MenuFrame = Instance.new("Frame")
+MenuFrame.Name = "MenuFrame"
+MenuFrame.Size = UDim2.new(0, 220, 0, 130)
+MenuFrame.Position = UDim2.new(0.5, -110, 0.5, -65)
+MenuFrame.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+MenuFrame.Visible = false
+MenuFrame.Parent = ScreenGui
+MenuFrame.BorderSizePixel = 2
+MenuFrame.Active = true
+MenuFrame.Draggable = true  -- ลากได้
+
+local Title = Instance.new("TextLabel")
+Title.Parent = MenuFrame
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "⚡ เมนูวิ่งไว ⚡"
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextScaled = true
+
+-- ปุ่มเปิด/ปิดวิ่งไว
+local SpeedButton = Instance.new("TextButton")
+SpeedButton.Parent = MenuFrame
+SpeedButton.Size = UDim2.new(0.8, 0, 0, 40)
+SpeedButton.Position = UDim2.new(0.1, 0, 0.5, -20)
+SpeedButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+SpeedButton.Text = "เปิดโหมดวิ่งไว"
+SpeedButton.TextColor3 = Color3.new(1, 1, 1)
+SpeedButton.TextScaled = true
+
+-- ปุ่มปิดเมนู
+local CloseButton = Instance.new("TextButton")
+CloseButton.Parent = MenuFrame
+CloseButton.Size = UDim2.new(0.3, 0, 0, 30)
+CloseButton.Position = UDim2.new(0.65, 0, 0, 10)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+CloseButton.Text = "ปิด"
+CloseButton.TextColor3 = Color3.new(1, 1, 1)
+CloseButton.TextScaled = true
+
+-- ====== Logic ======
+local menuOpen = false
+local speedOn = false
+local defaultSpeed = 16
+
+-- กดปุ่มเปิดเมนู
+OpenButton.MouseButton1Click:Connect(function()
+	menuOpen = not menuOpen
+	MenuFrame.Visible = menuOpen
+end)
+
+-- กดปุ่มในเมนู "วิ่งไว"
+SpeedButton.MouseButton1Click:Connect(function()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	if not speedOn then
+		humanoid.WalkSpeed = 100
+		speedOn = true
+		SpeedButton.Text = "ปิดโหมดวิ่งไว"
+		SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+	else
+		humanoid.WalkSpeed = defaultSpeed
+		speedOn = false
+		SpeedButton.Text = "เปิดโหมดวิ่งไว"
+		SpeedButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+	end
+end)
+
+-- กดปุ่มปิดเมนู
+CloseButton.MouseButton1Click:Connect(function()
+	menuOpen = false
+	MenuFrame.Visible = false
+end)
