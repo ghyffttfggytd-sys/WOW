@@ -1,0 +1,179 @@
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+--// Settings
+local espEnabled = true
+local lockTargetEnabled = true
+local teamColorEnabled = true
+local smoothAimSpeed = 0.15
+local highlightList = {}
+
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "ProESP_UI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 360)
+mainFrame.Position = UDim2.new(0.02, 0, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Visible = true
+mainFrame.Parent = gui
+
+local uicorner = Instance.new("UICorner", mainFrame)
+uicorner.CornerRadius = UDim.new(0, 12)
+
+local uiStroke = Instance.new("UIStroke", mainFrame)
+uiStroke.Thickness = 2
+uiStroke.Color = Color3.fromRGB(0, 255, 128)
+
+local title = Instance.new("TextLabel")
+title.Text = "🎯 Pro ESP Controller (Upgraded)"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextColor3 = Color3.fromRGB(0, 255, 128)
+title.BackgroundTransparency = 1
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Parent = mainFrame
+
+--// Helper Functions
+local function createButton(name, text, pos, func)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Text = text
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 15
+	button.TextColor3 = Color3.new(1,1,1)
+	button.Size = UDim2.new(0.8, 0, 0, 35)
+	button.Position = UDim2.new(0.1,0,pos,0)
+	button.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	button.Parent = mainFrame
+	
+	local corner = Instance.new("UICorner", button)
+	corner.CornerRadius = UDim.new(0,8)
+	
+	button.MouseButton1Click:Connect(func)
+	button.MouseEnter:Connect(function() button.BackgroundColor3 = Color3.fromRGB(0,200,120) end)
+	button.MouseLeave:Connect(function() button.BackgroundColor3 = Color3.fromRGB(40,40,40) end)
+end
+
+--// ESP Functions
+local function addESP(target)
+	if target == nil or target:FindFirstChild("HumanoidRootPart") == nil then return end
+	if highlightList[target] then return end -- มีแล้ว
+
+	local highlight = Instance.new("Highlight")
+	highlight.Adornee = target
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.FillTransparency = 0.7
+	highlight.OutlineTransparency = 0
+	highlight.Parent = target
+
+	-- สีตามทีม
+	if teamColorEnabled and player.Team and Players:GetPlayerFromCharacter(target) then
+		if player.Team == Players:GetPlayerFromCharacter(target).Team then
+			highlight.FillColor = Color3.fromRGB(0,255,0)
+		else
+			highlight.FillColor = Color3.fromRGB(255,0,0)
+		end
+	else
+		highlight.FillColor = Color3.fromRGB(255,255,0)
+	end
+
+	highlightList[target] = highlight
+end
+
+local function removeESP(target)
+	if highlightList[target] then
+		highlightList[target]:Destroy()
+		highlightList[target] = nil
+	end
+end
+
+local function updateESP()
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			if espEnabled then
+				addESP(p.Character)
+			else
+				removeESP(p.Character)
+			end
+		end
+	end
+end
+
+--// Lock Target Functions
+local function getClosestEnemy()
+	local closestDist, closestEnemy = math.huge, nil
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			if player.Team and p.Team == player.Team then continue end
+			local pos, onScreen = camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+			if onScreen then
+				local dist = (Vector2.new(pos.X,pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+				if dist < closestDist then
+					closestDist = dist
+					closestEnemy = p
+				end
+			end
+		end
+	end
+	return closestEnemy
+end
+
+RunService.RenderStepped:Connect(function()
+	updateESP()
+	if lockTargetEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+		local target = getClosestEnemy()
+		if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+			-- Smooth Aim
+			local targetCFrame = CFrame.new(camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
+			camera.CFrame = camera.CFrame:Lerp(targetCFrame, smoothAimSpeed)
+		end
+	end
+end)
+
+--// Buttons
+createButton("ToggleESP","🔵 Toggle ESP",0.15,function()
+	espEnabled = not espEnabled
+	updateESP()
+end)
+
+createButton("ToggleLock","🎯 Toggle Lock Target",0.3,function()
+	lockTargetEnabled = not lockTargetEnabled
+end)
+
+createButton("ToggleTeam","🟢 Toggle Team Color",0.45,function()
+	teamColorEnabled = not teamColorEnabled
+	updateESP()
+end)
+
+createButton("CloseUI","❌ Close / Hide UI (Press P)",0.6,function()
+	mainFrame.Visible = false
+end)
+
+--// Toggle UI
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.P then
+		mainFrame.Visible = not mainFrame.Visible
+	end
+end)
+
+--// Auto-add ESP for players joining
+Players.PlayerAdded:Connect(function(p)
+	p.CharacterAdded:Connect(function(c)
+		if espEnabled then addESP(c) end
+	end)
+end)
+Players.PlayerRemoving:Connect(function(p)
+	if p.Character then removeESP(p.Character) end
+end)
