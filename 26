@@ -5,70 +5,90 @@ local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
+local TweenService = game:GetService("TweenService")
 
 --==[ Settings ]==--
-local espEnabled = true
-local reticleSize = 100
-local magneticForce = 300
-local updateInterval = 1
-local highlights = {}
+local ESPEnabled = true
+local ReticleEnabled = true
+local MagneticEnabled = true
+local LockTargetEnabled = true
+local ReticleSize = 100
+local MagneticForce = 300
+local UpdateInterval = 1
+local Highlights = {}
+local CurrentTarget = nil
 
---==[ GUI ]==--
+--==[ GUI Setup ]==--
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Pro_UI"
+ScreenGui.Name = "ProUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
---==[ Main Menu ]==--
+-- Main Frame
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 100)
+MainFrame.Size = UDim2.new(0,250,0,120)
 MainFrame.Position = UDim2.new(0.35,0,0.05,0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0,10)
-UICorner.Parent = MainFrame
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0,12)
+Corner.Parent = MainFrame
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Thickness = 2
-UIStroke.Color = Color3.fromRGB(80,80,80)
-UIStroke.Parent = MainFrame
+local Stroke = Instance.new("UIStroke")
+Stroke.Thickness = 2
+Stroke.Color = Color3.fromRGB(0,255,0)
+Stroke.Parent = MainFrame
 
---==[ Close Button ❌ ]==--
-local CloseButton = Instance.new("TextButton")
-CloseButton.Size = UDim2.new(0,40,0,40)
-CloseButton.Position = UDim2.new(1,-45,0,5)
-CloseButton.Text = "❌"
-CloseButton.TextScaled = true
-CloseButton.Font = Enum.Font.SourceSansBold
-CloseButton.TextColor3 = Color3.fromRGB(255,0,0)
-CloseButton.BackgroundColor3 = Color3.fromRGB(0,0,0)
-CloseButton.BorderSizePixel = 0
-CloseButton.Parent = MainFrame
+-- Close Button ❌
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0,40,0,40)
+CloseBtn.Position = UDim2.new(1,-45,0,5)
+CloseBtn.Text = "❌"
+CloseBtn.TextScaled = true
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextColor3 = Color3.fromRGB(255,0,0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Parent = MainFrame
 
 local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0,8)
-CloseCorner.Parent = CloseButton
+CloseCorner.CornerRadius = UDim.new(0,6)
+CloseCorner.Parent = CloseBtn
 
 local CloseStroke = Instance.new("UIStroke")
 CloseStroke.Thickness = 1.5
-CloseStroke.Color = Color3.fromRGB(150,0,0)
-CloseStroke.Parent = CloseButton
+CloseStroke.Color = Color3.fromRGB(0,255,0)
+CloseStroke.Parent = CloseBtn
 
-CloseButton.MouseButton1Click:Connect(function()
-	espEnabled = not espEnabled
-	CloseButton.TextColor3 = espEnabled and Color3.fromRGB(255,0,0) or Color3.fromRGB(0,255,0)
+-- Hover effect
+CloseBtn.MouseEnter:Connect(function()
+	TweenService:Create(CloseBtn, TweenInfo.new(0.2), {TextColor3=Color3.fromRGB(255,0,0)}):Play()
+end)
+CloseBtn.MouseLeave:Connect(function()
+	TweenService:Create(CloseBtn, TweenInfo.new(0.2), {TextColor3=Color3.fromRGB(255,0,0)}):Play()
 end)
 
---==[ Slider ขนาดวงกลม ]==--
+CloseBtn.MouseButton1Click:Connect(function()
+	MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Toggle Menu with P
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.P then
+		MainFrame.Visible = not MainFrame.Visible
+	end
+end)
+
+--==[ Slider Reticle ]==--
 local SliderLabel = Instance.new("TextLabel")
 SliderLabel.Size = UDim2.new(1,-60,0,20)
 SliderLabel.Position = UDim2.new(0,10,0,55)
 SliderLabel.BackgroundTransparency = 1
-SliderLabel.Text = "วงกลม: "..reticleSize
+SliderLabel.Text = "วงกลม: "..ReticleSize
 SliderLabel.TextColor3 = Color3.fromRGB(255,255,255)
 SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
 SliderLabel.Font = Enum.Font.SourceSansBold
@@ -90,14 +110,14 @@ SliderCorner.CornerRadius = UDim.new(0,6)
 SliderCorner.Parent = Slider
 
 Slider.MouseButton1Click:Connect(function()
-	reticleSize = reticleSize + 20
-	if reticleSize > 200 then reticleSize = 40 end
-	SliderLabel.Text = "วงกลม: "..reticleSize
+	ReticleSize = ReticleSize + 20
+	if ReticleSize > 200 then ReticleSize = 40 end
+	SliderLabel.Text = "วงกลม: "..ReticleSize
 end)
 
---==[ Target Reticle ]==--
+--==[ Target Reticle Drawing ]==--
 local Circle = Drawing.new("Circle")
-Circle.Visible = true
+Circle.Visible = ReticleEnabled
 Circle.Color = Color3.fromRGB(255,255,255)
 Circle.Thickness = 1.5
 Circle.NumSides = 100
@@ -106,39 +126,38 @@ Circle.Transparency = 1
 Circle.ZIndex = 9999
 
 RunService.RenderStepped:Connect(function()
-	local center = Camera.ViewportSize / 2
+	local center = Camera.ViewportSize/2
 	Circle.Position = Vector2.new(center.X,center.Y)
-	Circle.Radius = reticleSize/2
-	Circle.Visible = espEnabled
+	Circle.Radius = ReticleSize/2
+	Circle.Visible = ReticleEnabled
 end)
 
---==[ ESP ]==--
-local function createESP(player)
+--==[ ESP System ]==--
+local function CreateESP(player)
 	if player == LocalPlayer then return end
-	local character = player.Character
-	if not character then return end
-	local highlight = Instance.new("Highlight")
-	highlight.Adornee = character
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.FillTransparency = 0.7
-	highlight.OutlineTransparency = 0
-	highlight.Parent = character
+	local char = player.Character
+	if not char then return end
+	if Highlights[player] then return end
+	local hl = Instance.new("Highlight")
+	hl.Adornee = char
+	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	hl.FillTransparency = 0.7
+	hl.OutlineTransparency = 0
 	if player.Team == LocalPlayer.Team then
-		highlight.FillColor = Color3.fromRGB(0,255,0)
+		hl.FillColor = Color3.fromRGB(0,255,0)
 	else
-		highlight.FillColor = Color3.fromRGB(255,0,0)
+		hl.FillColor = Color3.fromRGB(255,0,0)
 	end
-	highlights[player] = highlight
+	hl.Parent = char
+	Highlights[player] = hl
 end
 
 task.spawn(function()
-	while task.wait(updateInterval) do
-		if espEnabled then
-			for _, plr in ipairs(Players:GetPlayers()) do
+	while task.wait(UpdateInterval) do
+		if ESPEnabled then
+			for _,plr in pairs(Players:GetPlayers()) do
 				if plr ~= LocalPlayer then
-					if not highlights[plr] or not highlights[plr].Parent then
-						createESP(plr)
-					end
+					CreateESP(plr)
 				end
 			end
 		end
@@ -146,9 +165,9 @@ task.spawn(function()
 end)
 
 Players.PlayerRemoving:Connect(function(player)
-	if highlights[player] then
-		highlights[player]:Destroy()
-		highlights[player]=nil
+	if Highlights[player] then
+		Highlights[player]:Destroy()
+		Highlights[player]=nil
 	end
 end)
 
@@ -156,14 +175,14 @@ end)
 local function getEnemyInCircle()
 	local closest, minDist = nil, math.huge
 	local center = Camera.ViewportSize/2
-	for _, plr in pairs(Players:GetPlayers()) do
+	for _,plr in pairs(Players:GetPlayers()) do
 		if plr ~= LocalPlayer and plr.Team ~= LocalPlayer.Team and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
 			local hrp = plr.Character.HumanoidRootPart
 			local pos, visible = Camera:WorldToViewportPoint(hrp.Position)
 			if visible then
 				local dx, dy = pos.X-center.X, pos.Y-center.Y
-				local dist = math.sqrt(dx*dx + dy*dy)
-				if dist<=reticleSize/2 and dist<minDist then
+				local dist = math.sqrt(dx*dx+dy*dy)
+				if dist<=ReticleSize/2 and dist<minDist then
 					minDist=dist
 					closest=hrp
 				end
@@ -173,7 +192,7 @@ local function getEnemyInCircle()
 	return closest
 end
 
-local function shootBullet()
+local function ShootBullet()
 	local origin = Camera.CFrame.Position
 	local direction = Camera.CFrame.LookVector
 	local bullet = Instance.new("Part")
@@ -193,15 +212,13 @@ local function shootBullet()
 
 	local target = getEnemyInCircle()
 
-	if target then
+	if target and MagneticEnabled then
 		task.spawn(function()
 			while bullet and bullet.Parent do
 				if target and target.Parent and target:IsDescendantOf(Workspace) then
-					local dir=(target.Position-bullet.Position).Unit
-					bodyVel.Velocity=dir*magneticForce
-				else
-					break
-				end
+					local dir = (target.Position-bullet.Position).Unit
+					bodyVel.Velocity = dir*MagneticForce
+				else break end
 				RunService.Heartbeat:Wait()
 			end
 		end)
@@ -209,7 +226,7 @@ local function shootBullet()
 
 	bullet.Touched:Connect(function(hit)
 		local hum = hit.Parent:FindFirstChildOfClass("Humanoid")
-		if hum and hit.Parent ~= LocalPlayer.Character then
+		if hum and hit.Parent~=LocalPlayer.Character then
 			hum:TakeDamage(25)
 			bullet:Destroy()
 		end
@@ -221,8 +238,8 @@ end
 UserInputService.InputBegan:Connect(function(input,gp)
 	if gp then return end
 	if input.UserInputType==Enum.UserInputType.MouseButton1 then
-		shootBullet()
+		ShootBullet()
 	end
 end)
 
-print("✅ โค้ดสมบูรณ์: ESP + Reticle + Magnetic Bullet พร้อม GUI โหลดเรียบร้อย!")
+print("✅ ระบบสมบูรณ์: ESP + Reticle + Magnetic Bullet + GUI หรู พร้อมเปิด/ปิดด้วยปุ่ม P")
