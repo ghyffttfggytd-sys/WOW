@@ -1,160 +1,112 @@
--- Services
+--// Services
 local Players = game:GetService("Players")
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
--- สร้าง ScreenGui
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+--// Settings
+local espEnabled = true
+local highlightList = {}
+
+--// GUI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "GameUI"
-screenGui.Parent = PlayerGui
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- ตัว Container หลัก
-local container = Instance.new("Frame")
-container.Size = UDim2.new(0, 900, 0, 550)
-container.Position = UDim2.new(0.5, -450, 0.5, -275)
-container.BackgroundColor3 = Color3.fromRGB(31, 31, 31)
-container.BorderSizePixel = 0
-container.AnchorPoint = Vector2.new(0.5, 0.5)
-container.ClipsDescendants = true
-container.Parent = screenGui
+-- Draggable UI Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 150, 0, 50)
+mainFrame.Position = UDim2.new(0.05, 0, 0.05, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
 
--- Top Menu
-local topMenu = Instance.new("Frame")
-topMenu.Size = UDim2.new(1, 0, 0, 50)
-topMenu.BackgroundColor3 = Color3.fromRGB(31, 31, 31)
-topMenu.BorderSizePixel = 0
-topMenu.Parent = container
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(1, 0, 1, 0)
+toggleButton.Text = "ESP: ✔️"
+toggleButton.TextColor3 = Color3.fromRGB(255,255,255)
+toggleButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+toggleButton.Parent = mainFrame
 
--- Logo
-local logo = Instance.new("TextLabel")
-logo.Text = "Z"
-logo.Font = Enum.Font.SourceSansBold
-logo.TextSize = 30
-logo.TextColor3 = Color3.fromRGB(255, 71, 71)
-logo.BackgroundTransparency = 1
-logo.Position = UDim2.new(0, 10, 0, 0)
-logo.Size = UDim2.new(0, 50, 1, 0)
-logo.Parent = topMenu
-
--- Tabs
-local tabNames = {"Main", "Items", "Autos", "Teleports", "Character"}
-for i, name in ipairs(tabNames) do
-    local tab = Instance.new("TextButton")
-    tab.Text = name
-    tab.Font = Enum.Font.SourceSans
-    tab.TextSize = 16
-    tab.TextColor3 = Color3.fromRGB(170, 170, 170)
-    tab.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    tab.BorderSizePixel = 0
-    tab.Position = UDim2.new(0, 70 + (i-1)*100, 0, 0)
-    tab.Size = UDim2.new(0, 90, 1, 0)
-    tab.Parent = topMenu
-end
-
--- Close Icon ❌
-local closeIcon = Instance.new("TextButton")
-closeIcon.Text = "❌"
-closeIcon.Font = Enum.Font.SourceSans
-closeIcon.TextSize = 20
-closeIcon.TextColor3 = Color3.fromRGB(170,170,170)
-closeIcon.BackgroundTransparency = 1
-closeIcon.Position = UDim2.new(1, -30, 0, 0)
-closeIcon.Size = UDim2.new(0, 30, 1, 0)
-closeIcon.Parent = topMenu
-
--- Main Structure
-local mainStructure = Instance.new("Frame")
-mainStructure.Size = UDim2.new(1, 0, 1, -50)
-mainStructure.Position = UDim2.new(0, 0, 0, 50)
-mainStructure.BackgroundTransparency = 1
-mainStructure.Parent = container
-
--- Sidebar
-local sidebar = Instance.new("Frame")
-sidebar.Size = UDim2.new(0, 60, 1, 0)
-sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-sidebar.BorderSizePixel = 0
-sidebar.Parent = mainStructure
-
--- Sidebar Icons
-local icons = {"\u{2699}", "\u{2302}", "\u{1F52F}", "\u{1F4BE}", "\u{1F4AC}"}
-for i, iconText in ipairs(icons) do
-    local icon = Instance.new("TextButton")
-    icon.Text = iconText
-    icon.Font = Enum.Font.SourceSans
-    icon.TextSize = 24
-    icon.TextColor3 = Color3.fromRGB(170,170,170)
-    icon.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    icon.BorderSizePixel = 0
-    icon.Size = UDim2.new(0, 40, 0, 40)
-    icon.Position = UDim2.new(0, 10, 0, 10 + (i-1)*55)
-    icon.Parent = sidebar
-end
-
--- Bottom Avatar
-local avatar = Instance.new("TextButton")
-avatar.Text = "\u{1F414}"
-avatar.Font = Enum.Font.SourceSans
-avatar.TextSize = 20
-avatar.TextColor3 = Color3.fromRGB(255,255,255)
-avatar.Size = UDim2.new(0, 40, 0, 40)
-avatar.Position = UDim2.new(0, 10, 1, -50)
-avatar.BackgroundColor3 = Color3.fromRGB(68,68,68)
-avatar.BorderSizePixel = 3
-avatar.BorderColor3 = Color3.fromRGB(255,71,71)
-avatar.Parent = sidebar
-
--- Content Area
-local contentArea = Instance.new("Frame")
-contentArea.Size = UDim2.new(1, -60, 1, 0)
-contentArea.Position = UDim2.new(0, 60, 0, 0)
-contentArea.BackgroundColor3 = Color3.fromRGB(56,56,56)
-contentArea.BorderSizePixel = 0
-contentArea.Parent = mainStructure
-
--- Content Header
-local contentHeader = Instance.new("TextLabel")
-contentHeader.Text = "Farming"
-contentHeader.Font = Enum.Font.SourceSans
-contentHeader.TextSize = 24
-contentHeader.TextColor3 = Color3.fromRGB(240,240,240)
-contentHeader.BackgroundTransparency = 1
-contentHeader.Position = UDim2.new(0, 10, 0, 10)
-contentHeader.Size = UDim2.new(1, -20, 0, 30)
-contentHeader.Parent = contentArea
-
--- Item Rows
-for i=1,4 do
-    local itemRow = Instance.new("Frame")
-    itemRow.Size = UDim2.new(1, -20, 0, 70)
-    itemRow.Position = UDim2.new(0, 10, 0, 50 + (i-1)*80)
-    itemRow.BackgroundColor3 = Color3.fromRGB(45,45,45)
-    itemRow.BorderSizePixel = 1
-    itemRow.BorderColor3 = Color3.fromRGB(255,255,255)
-    itemRow.Parent = contentArea
-end
-
--- Floating button ✔️ สำหรับมือถือ
-local openButton = Instance.new("TextButton")
-openButton.Text = "✔️"
-openButton.Font = Enum.Font.SourceSansBold
-openButton.TextSize = 24
-openButton.TextColor3 = Color3.fromRGB(255,255,255)
-openButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
-openButton.BorderSizePixel = 0
-openButton.Size = UDim2.new(0, 50, 0, 50)
-openButton.Position = UDim2.new(0, 20, 0, 20)
-openButton.AnchorPoint = Vector2.new(0, 0)
-openButton.Parent = screenGui
-openButton.Visible = false -- เริ่มซ่อน เพราะ UI เปิดอยู่
-
--- ฟังก์ชันเปิด/ปิด UI
-closeIcon.MouseButton1Click:Connect(function()
-    container.Visible = false
-    openButton.Visible = true
+-- Toggle ESP
+toggleButton.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    toggleButton.Text = espEnabled and "ESP: ✔️" or "ESP: ❌"
+    -- Hide highlights if disabled
+    if not espEnabled then
+        for _, hl in pairs(highlightList) do
+            hl.Enabled = false
+        end
+    else
+        for _, hl in pairs(highlightList) do
+            hl.Enabled = true
+        end
+    end
 end)
 
-openButton.MouseButton1Click:Connect(function()
-    container.Visible = true
-    openButton.Visible = false
+--// ESP Function
+local function createESP(character)
+    if highlightList[character] then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = character
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.OutlineColor = Color3.new(1,1,1)
+    
+    -- Determine team color
+    if character:FindFirstChild("Humanoid") then
+        if character.Parent == player.Team then
+            highlight.FillColor = Color3.fromRGB(0,255,0) -- เพื่อน สีเขียว
+        else
+            highlight.FillColor = Color3.fromRGB(255,0,0) -- ศัตรู สีแดง
+        end
+    end
+    highlight.Parent = screenGui
+    highlightList[character] = highlight
+end
+
+-- Remove ESP if player leaves
+Players.PlayerRemoving:Connect(function(p)
+    if p.Character and highlightList[p.Character] then
+        highlightList[p.Character]:Destroy()
+        highlightList[p.Character] = nil
+    end
+end)
+
+-- Track new characters
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(c)
+        createESP(c)
+    end)
+end)
+
+-- Initialize ESP for existing players
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= player then
+        if p.Character then
+            createESP(p.Character)
+        end
+        p.CharacterAdded:Connect(function(c)
+            createESP(c)
+        end)
+    end
+end
+
+-- Update loop
+RunService.RenderStepped:Connect(function()
+    if not espEnabled then return end
+    for char, hl in pairs(highlightList) do
+        if char.Parent and char:FindFirstChild("Humanoid") then
+            -- Update color dynamically if team changes
+            if char.Parent == player.Team then
+                hl.FillColor = Color3.fromRGB(0,255,0)
+            else
+                hl.FillColor = Color3.fromRGB(255,0,0)
+            end
+        end
+    end
 end)
