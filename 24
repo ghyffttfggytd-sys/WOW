@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -28,39 +29,95 @@ targetCircle.BorderSizePixel = 3
 targetCircle.BorderColor3 = Color3.fromRGB(255,0,0)
 targetCircle.ZIndex = 10
 
--- เมนู GUI
+-- ฟังก์ชันสร้างปุ่ม modern
+local function createButton(parent, text, position, size, color)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = size
+    btn.Position = position
+    btn.Text = text
+    btn.BackgroundColor3 = color
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextScaled = true
+    btn.BorderSizePixel = 0
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0, 10)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = Color3.fromRGB(80,80,80)
+    stroke.Thickness = 1
+
+    -- Hover effect
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.7}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
+    end)
+
+    return btn
+end
+
+-- Frame GUI modern overlay
 local menuFrame = Instance.new("Frame", gui)
-menuFrame.Size = UDim2.new(0, 220, 0, 210)
+menuFrame.Size = UDim2.new(0, 250, 0, 230)
 menuFrame.Position = UDim2.new(0.05,0,0.6,0)
-menuFrame.Active = true
-menuFrame.Draggable = true
-menuFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-menuFrame.BorderSizePixel = 2
-menuFrame.BorderColor3 = Color3.fromRGB(255,0,0)
+menuFrame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+menuFrame.BorderSizePixel = 0
+menuFrame.ClipsDescendants = true
+menuFrame.ZIndex = 5
+local corner = Instance.new("UICorner", menuFrame)
+corner.CornerRadius = UDim.new(0, 15)
 
+-- Drag functionality
+local dragging = false
+local dragInput, mousePos, framePos
+menuFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        mousePos = input.Position
+        framePos = menuFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+menuFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        local delta = dragInput.Position - mousePos
+        menuFrame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X,
+                                       framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Header
 local title = Instance.new("TextLabel", menuFrame)
-title.Size = UDim2.new(1,0,0,30)
-title.Text = "🎯 ตั้งค่า"
+title.Size = UDim2.new(1,0,0,40)
+title.Text = "🎯 Target Settings"
 title.TextScaled = true
-title.BackgroundColor3 = Color3.fromRGB(255,0,0)
-title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundColor3 = Color3.fromRGB(45,45,45)
+title.BorderSizePixel = 0
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Font = Enum.Font.GothamSemibold
+local titleCorner = Instance.new("UICorner", title)
+titleCorner.CornerRadius = UDim.new(0, 12)
 
--- ปุ่มเปิด/ปิด ESP
-local espButton = Instance.new("TextButton", menuFrame)
-espButton.Size = UDim2.new(1,-20,0,40)
-espButton.Position = UDim2.new(0,10,0,40)
-espButton.Text = "ESP: เปิด"
-espButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-espButton.TextColor3 = Color3.new(1,1,1)
-
+-- ปุ่ม ESP
+local espButton = createButton(menuFrame, "ESP: เปิด", UDim2.new(0,10,0,50), UDim2.new(1,-20,0,40), Color3.fromRGB(0,170,0))
 espButton.MouseButton1Click:Connect(function()
     espEnabled = not espEnabled
     if espEnabled then
         espButton.Text = "ESP: เปิด"
-        espButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
+        espButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
     else
         espButton.Text = "ESP: ปิด"
-        espButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
+        espButton.BackgroundColor3 = Color3.fromRGB(170,0,0)
         for _,hl in pairs(highlightList) do
             if hl and hl.Parent then hl:Destroy() end
         end
@@ -68,67 +125,46 @@ espButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- ปุ่มเปิด/ปิด Lock Target
-local lockButton = Instance.new("TextButton", menuFrame)
-lockButton.Size = UDim2.new(1,-20,0,40)
-lockButton.Position = UDim2.new(0,10,0,90)
-lockButton.Text = "Lock Target: เปิด"
-lockButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-lockButton.TextColor3 = Color3.new(1,1,1)
-
+-- ปุ่ม Lock Target
+local lockButton = createButton(menuFrame, "Lock Target: เปิด", UDim2.new(0,10,0,100), UDim2.new(1,-20,0,40), Color3.fromRGB(0,170,0))
 lockButton.MouseButton1Click:Connect(function()
     lockTargetEnabled = not lockTargetEnabled
     if lockTargetEnabled then
         lockButton.Text = "Lock Target: เปิด"
-        lockButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
+        lockButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
     else
         lockButton.Text = "Lock Target: ปิด"
-        lockButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
+        lockButton.BackgroundColor3 = Color3.fromRGB(170,0,0)
         currentTarget = nil
     end
 end)
 
--- ปุ่มปรับขนาดวง
+-- ปรับขนาดวง
 local sizeLabel = Instance.new("TextLabel", menuFrame)
 sizeLabel.Size = UDim2.new(1,-20,0,30)
-sizeLabel.Position = UDim2.new(0,10,0,140)
-sizeLabel.Text = "ขนาดวง: "..targetCircleSize
+sizeLabel.Position = UDim2.new(0,10,0,150)
+sizeLabel.Text = "Circle Size: "..targetCircleSize
 sizeLabel.TextScaled = true
 sizeLabel.BackgroundTransparency = 1
-sizeLabel.TextColor3 = Color3.new(1,1,1)
+sizeLabel.TextColor3 = Color3.fromRGB(255,255,255)
+sizeLabel.Font = Enum.Font.Gotham
 
-local increaseCircle = Instance.new("TextButton", menuFrame)
-increaseCircle.Size = UDim2.new(0.45,-10,0,30)
-increaseCircle.Position = UDim2.new(0,10,0,170)
-increaseCircle.Text = "+"
-increaseCircle.BackgroundColor3 = Color3.fromRGB(0,150,0)
-
-local decreaseCircle = Instance.new("TextButton", menuFrame)
-decreaseCircle.Size = UDim2.new(0.45,-10,0,30)
-decreaseCircle.Position = UDim2.new(0.5,0,0,170)
-decreaseCircle.Text = "-"
-decreaseCircle.BackgroundColor3 = Color3.fromRGB(150,0,0)
+local increaseCircle = createButton(menuFrame, "+", UDim2.new(0,10,0,180), UDim2.new(0.45,-15,0,30), Color3.fromRGB(0,170,0))
+local decreaseCircle = createButton(menuFrame, "-", UDim2.new(0.5,5,0,180), UDim2.new(0.45,-15,0,30), Color3.fromRGB(170,0,0))
 
 increaseCircle.MouseButton1Click:Connect(function()
     targetCircleSize = math.clamp(targetCircleSize+10,20,300)
     targetCircle.Size = UDim2.new(0,targetCircleSize,0,targetCircleSize)
-    sizeLabel.Text = "ขนาดวง: "..targetCircleSize
+    sizeLabel.Text = "Circle Size: "..targetCircleSize
 end)
-
 decreaseCircle.MouseButton1Click:Connect(function()
     targetCircleSize = math.clamp(targetCircleSize-10,20,300)
     targetCircle.Size = UDim2.new(0,targetCircleSize,0,targetCircleSize)
-    sizeLabel.Text = "ขนาดวง: "..targetCircleSize
+    sizeLabel.Text = "Circle Size: "..targetCircleSize
 end)
 
 -- ปุ่มเปิด/ปิด UI
-local toggleUIButton = Instance.new("TextButton", gui)
-toggleUIButton.Size = UDim2.new(0, 120, 0, 30)
-toggleUIButton.Position = UDim2.new(0.8,0,0.05,0)
-toggleUIButton.Text = "UI: ปิด/เปิด"
-toggleUIButton.BackgroundColor3 = Color3.fromRGB(100,100,100)
-toggleUIButton.TextColor3 = Color3.new(1,1,1)
-
+local toggleUIButton = createButton(gui, "UI: ปิด/เปิด", UDim2.new(0.8,0,0.05,0), UDim2.new(0,120,0,30), Color3.fromRGB(100,100,100))
 toggleUIButton.MouseButton1Click:Connect(function()
     guiVisible = not guiVisible
     menuFrame.Visible = guiVisible
@@ -145,18 +181,7 @@ local function isInCircle(pos)
     return (dx*dx + dy*dy) <= (targetCircleSize/2)^2
 end
 
--- ฟังก์ชันตรวจสอบว่ามองเห็นเป้าหมาย
-local function canSeeTarget(root)
-    local origin = camera.CFrame.Position
-    local direction = (root.Position - origin)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {player.Character}
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local result = Workspace:Raycast(origin, direction, raycastParams)
-    return not result or result.Instance:IsDescendantOf(root.Parent)
-end
-
--- ฟังก์ชันสร้าง Highlight
+-- Highlight ทะลุกำแพง
 local function highlightPlayer(character, color)
     if highlightList[character] then return end
     local hl = Instance.new("Highlight")
@@ -166,38 +191,31 @@ local function highlightPlayer(character, color)
     highlightList[character] = hl
 end
 
--- ESP ทุก 1 วินาที (ดูผู้เล่นในแมพทั้งหมด)
+-- ESP ทุก 1 วินาที
 spawn(function()
     while true do
         if espEnabled then
             for _,plr in pairs(Players:GetPlayers()) do
                 if plr.Character and plr.Character:FindFirstChild("Humanoid") then
-                    local color
-                    if plr.Team == player.Team then
-                        color = Color3.fromRGB(0,255,0) -- เพื่อนร่วมทีมสีเขียว
-                    else
-                        color = Color3.fromRGB(255,0,0) -- ศัตรูสีแดง
-                    end
+                    local color = (plr.Team == player.Team) and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
                     highlightPlayer(plr.Character, color)
                 end
             end
         end
-        wait(1) -- อัปเดตทุก 1 วินาที
+        wait(1)
     end
 end)
 
--- Loop ล็อคเป้า (ไม่ล็อคเพื่อนร่วมทีม)
+-- Lock Target (ไม่ล็อคเพื่อนร่วมทีม)
 RunService.RenderStepped:Connect(function()
     if lockTargetEnabled then
         local closestDist = math.huge
         local closestEnemy = nil
-
         for _,plr in pairs(Players:GetPlayers()) do
             if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                -- ล็อคเฉพาะศัตรู
                 if plr.Team ~= player.Team then
                     local root = plr.Character.HumanoidRootPart
-                    if isInCircle(root.Position) and canSeeTarget(root) then
+                    if isInCircle(root.Position) then
                         local dist = (root.Position - camera.CFrame.Position).Magnitude
                         if dist < closestDist then
                             closestDist = dist
@@ -207,11 +225,9 @@ RunService.RenderStepped:Connect(function()
                 end
             end
         end
-
         currentTarget = closestEnemy
         if currentTarget and currentTarget:FindFirstChild("HumanoidRootPart") then
-            local targetPos = currentTarget.HumanoidRootPart.Position
-            camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
+            camera.CFrame = CFrame.new(camera.CFrame.Position, currentTarget.HumanoidRootPart.Position)
         end
     else
         currentTarget = nil
