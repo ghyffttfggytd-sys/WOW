@@ -1,97 +1,160 @@
--- 🏃 เมนูวิ่งไว (ใช้ได้ทั้งมือถือและคอม)
+-- Services
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local PlayerGui = player:WaitForChild("PlayerGui")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
 
--- สร้าง GUI หลัก
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SpeedMenu"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = PlayerGui
+-- สร้าง ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "GameUI"
+screenGui.Parent = PlayerGui
 
--- ปุ่มเปิดเมนู (ลอยขวาบน)
-local OpenButton = Instance.new("TextButton")
-OpenButton.Name = "OpenButton"
-OpenButton.Size = UDim2.new(0, 100, 0, 40)
-OpenButton.Position = UDim2.new(1, -110, 0, 10)
-OpenButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-OpenButton.Text = "เมนู"
-OpenButton.TextColor3 = Color3.new(1, 1, 1)
-OpenButton.TextScaled = true
-OpenButton.Parent = ScreenGui
+-- ตัว Container หลัก
+local container = Instance.new("Frame")
+container.Size = UDim2.new(0, 900, 0, 550)
+container.Position = UDim2.new(0.5, -450, 0.5, -275)
+container.BackgroundColor3 = Color3.fromRGB(31, 31, 31)
+container.BorderSizePixel = 0
+container.AnchorPoint = Vector2.new(0.5, 0.5)
+container.ClipsDescendants = true
+container.Parent = screenGui
 
--- กรอบเมนู
-local MenuFrame = Instance.new("Frame")
-MenuFrame.Name = "MenuFrame"
-MenuFrame.Size = UDim2.new(0, 220, 0, 130)
-MenuFrame.Position = UDim2.new(0.5, -110, 0.5, -65)
-MenuFrame.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-MenuFrame.Visible = false
-MenuFrame.Parent = ScreenGui
-MenuFrame.BorderSizePixel = 2
-MenuFrame.Active = true
-MenuFrame.Draggable = true  -- ลากได้
+-- Top Menu
+local topMenu = Instance.new("Frame")
+topMenu.Size = UDim2.new(1, 0, 0, 50)
+topMenu.BackgroundColor3 = Color3.fromRGB(31, 31, 31)
+topMenu.BorderSizePixel = 0
+topMenu.Parent = container
 
-local Title = Instance.new("TextLabel")
-Title.Parent = MenuFrame
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "⚡ เมนูวิ่งไว ⚡"
-Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.TextScaled = true
+-- Logo
+local logo = Instance.new("TextLabel")
+logo.Text = "Z"
+logo.Font = Enum.Font.SourceSansBold
+logo.TextSize = 30
+logo.TextColor3 = Color3.fromRGB(255, 71, 71)
+logo.BackgroundTransparency = 1
+logo.Position = UDim2.new(0, 10, 0, 0)
+logo.Size = UDim2.new(0, 50, 1, 0)
+logo.Parent = topMenu
 
--- ปุ่มเปิด/ปิดวิ่งไว
-local SpeedButton = Instance.new("TextButton")
-SpeedButton.Parent = MenuFrame
-SpeedButton.Size = UDim2.new(0.8, 0, 0, 40)
-SpeedButton.Position = UDim2.new(0.1, 0, 0.5, -20)
-SpeedButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-SpeedButton.Text = "เปิดโหมดวิ่งไว"
-SpeedButton.TextColor3 = Color3.new(1, 1, 1)
-SpeedButton.TextScaled = true
+-- Tabs
+local tabNames = {"Main", "Items", "Autos", "Teleports", "Character"}
+for i, name in ipairs(tabNames) do
+    local tab = Instance.new("TextButton")
+    tab.Text = name
+    tab.Font = Enum.Font.SourceSans
+    tab.TextSize = 16
+    tab.TextColor3 = Color3.fromRGB(170, 170, 170)
+    tab.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    tab.BorderSizePixel = 0
+    tab.Position = UDim2.new(0, 70 + (i-1)*100, 0, 0)
+    tab.Size = UDim2.new(0, 90, 1, 0)
+    tab.Parent = topMenu
+end
 
--- ปุ่มปิดเมนู
-local CloseButton = Instance.new("TextButton")
-CloseButton.Parent = MenuFrame
-CloseButton.Size = UDim2.new(0.3, 0, 0, 30)
-CloseButton.Position = UDim2.new(0.65, 0, 0, 10)
-CloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-CloseButton.Text = "ปิด"
-CloseButton.TextColor3 = Color3.new(1, 1, 1)
-CloseButton.TextScaled = true
+-- Close Icon ❌
+local closeIcon = Instance.new("TextButton")
+closeIcon.Text = "❌"
+closeIcon.Font = Enum.Font.SourceSans
+closeIcon.TextSize = 20
+closeIcon.TextColor3 = Color3.fromRGB(170,170,170)
+closeIcon.BackgroundTransparency = 1
+closeIcon.Position = UDim2.new(1, -30, 0, 0)
+closeIcon.Size = UDim2.new(0, 30, 1, 0)
+closeIcon.Parent = topMenu
 
--- ====== Logic ======
-local menuOpen = false
-local speedOn = false
-local defaultSpeed = 16
+-- Main Structure
+local mainStructure = Instance.new("Frame")
+mainStructure.Size = UDim2.new(1, 0, 1, -50)
+mainStructure.Position = UDim2.new(0, 0, 0, 50)
+mainStructure.BackgroundTransparency = 1
+mainStructure.Parent = container
 
--- กดปุ่มเปิดเมนู
-OpenButton.MouseButton1Click:Connect(function()
-	menuOpen = not menuOpen
-	MenuFrame.Visible = menuOpen
+-- Sidebar
+local sidebar = Instance.new("Frame")
+sidebar.Size = UDim2.new(0, 60, 1, 0)
+sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+sidebar.BorderSizePixel = 0
+sidebar.Parent = mainStructure
+
+-- Sidebar Icons
+local icons = {"\u{2699}", "\u{2302}", "\u{1F52F}", "\u{1F4BE}", "\u{1F4AC}"}
+for i, iconText in ipairs(icons) do
+    local icon = Instance.new("TextButton")
+    icon.Text = iconText
+    icon.Font = Enum.Font.SourceSans
+    icon.TextSize = 24
+    icon.TextColor3 = Color3.fromRGB(170,170,170)
+    icon.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    icon.BorderSizePixel = 0
+    icon.Size = UDim2.new(0, 40, 0, 40)
+    icon.Position = UDim2.new(0, 10, 0, 10 + (i-1)*55)
+    icon.Parent = sidebar
+end
+
+-- Bottom Avatar
+local avatar = Instance.new("TextButton")
+avatar.Text = "\u{1F414}"
+avatar.Font = Enum.Font.SourceSans
+avatar.TextSize = 20
+avatar.TextColor3 = Color3.fromRGB(255,255,255)
+avatar.Size = UDim2.new(0, 40, 0, 40)
+avatar.Position = UDim2.new(0, 10, 1, -50)
+avatar.BackgroundColor3 = Color3.fromRGB(68,68,68)
+avatar.BorderSizePixel = 3
+avatar.BorderColor3 = Color3.fromRGB(255,71,71)
+avatar.Parent = sidebar
+
+-- Content Area
+local contentArea = Instance.new("Frame")
+contentArea.Size = UDim2.new(1, -60, 1, 0)
+contentArea.Position = UDim2.new(0, 60, 0, 0)
+contentArea.BackgroundColor3 = Color3.fromRGB(56,56,56)
+contentArea.BorderSizePixel = 0
+contentArea.Parent = mainStructure
+
+-- Content Header
+local contentHeader = Instance.new("TextLabel")
+contentHeader.Text = "Farming"
+contentHeader.Font = Enum.Font.SourceSans
+contentHeader.TextSize = 24
+contentHeader.TextColor3 = Color3.fromRGB(240,240,240)
+contentHeader.BackgroundTransparency = 1
+contentHeader.Position = UDim2.new(0, 10, 0, 10)
+contentHeader.Size = UDim2.new(1, -20, 0, 30)
+contentHeader.Parent = contentArea
+
+-- Item Rows
+for i=1,4 do
+    local itemRow = Instance.new("Frame")
+    itemRow.Size = UDim2.new(1, -20, 0, 70)
+    itemRow.Position = UDim2.new(0, 10, 0, 50 + (i-1)*80)
+    itemRow.BackgroundColor3 = Color3.fromRGB(45,45,45)
+    itemRow.BorderSizePixel = 1
+    itemRow.BorderColor3 = Color3.fromRGB(255,255,255)
+    itemRow.Parent = contentArea
+end
+
+-- Floating button ✔️ สำหรับมือถือ
+local openButton = Instance.new("TextButton")
+openButton.Text = "✔️"
+openButton.Font = Enum.Font.SourceSansBold
+openButton.TextSize = 24
+openButton.TextColor3 = Color3.fromRGB(255,255,255)
+openButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+openButton.BorderSizePixel = 0
+openButton.Size = UDim2.new(0, 50, 0, 50)
+openButton.Position = UDim2.new(0, 20, 0, 20)
+openButton.AnchorPoint = Vector2.new(0, 0)
+openButton.Parent = screenGui
+openButton.Visible = false -- เริ่มซ่อน เพราะ UI เปิดอยู่
+
+-- ฟังก์ชันเปิด/ปิด UI
+closeIcon.MouseButton1Click:Connect(function()
+    container.Visible = false
+    openButton.Visible = true
 end)
 
--- กดปุ่มในเมนู "วิ่งไว"
-SpeedButton.MouseButton1Click:Connect(function()
-	local char = player.Character or player.CharacterAdded:Wait()
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
-
-	if not speedOn then
-		humanoid.WalkSpeed = 100
-		speedOn = true
-		SpeedButton.Text = "ปิดโหมดวิ่งไว"
-		SpeedButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-	else
-		humanoid.WalkSpeed = defaultSpeed
-		speedOn = false
-		SpeedButton.Text = "เปิดโหมดวิ่งไว"
-		SpeedButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-	end
-end)
-
--- กดปุ่มปิดเมนู
-CloseButton.MouseButton1Click:Connect(function()
-	menuOpen = false
-	MenuFrame.Visible = false
+openButton.MouseButton1Click:Connect(function()
+    container.Visible = true
+    openButton.Visible = false
 end)
