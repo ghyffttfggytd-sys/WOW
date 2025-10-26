@@ -1,159 +1,77 @@
---// Services
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
---// Settings
-local espEnabled = false
-local teamColorEnabled = true
-local highlightList = {}
-local maxDistance = 200
+-- Settings
+local FOVRadius = 100 -- ขนาดวงกลม FOV เริ่มต้น
+local LockSpeed = 0.3 -- ความเร็วล็อคเป้า
+local TouchAimEnabled = true -- ใช้สำหรับมือถือ
 
---// ฟังก์ชันสร้าง Highlight ติดตัวผู้เล่นตลอด
-local function createESP(player)
-    if highlightList[player] then
-        highlightList[player]:Destroy()
-        highlightList[player] = nil
-    end
+-- Function: หาศัตรูใกล้ crosshair
+local function GetClosestEnemy()
+    local closestDistance = FOVRadius
+    local target = nil
 
-    local highlight = Instance.new("Highlight")
-    highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
-    highlight.OutlineColor = Color3.fromRGB(255,255,255)
-    highlight.OutlineThickness = 2
-    highlight.Parent = Workspace
-    highlight.Name = player.Name .. "_ESP"
-
-    highlightList[player] = highlight
-
-    local function updateAdornee()
-        if player.Character then
-            highlight.Adornee = player.Character
-            if teamColorEnabled then
-                if player.Team == LocalPlayer.Team then
-                    highlight.FillColor = Color3.fromRGB(0,255,0)
-                else
-                    highlight.FillColor = Color3.fromRGB(255,0,0)
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team then
+            local character = player.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                local screenPos, onScreen = Camera:WorldToScreenPoint(character.HumanoidRootPart.Position)
+                if onScreen then
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    if distance < closestDistance then
+                        closestDistance = distance
+                        target = character.HumanoidRootPart
+                    end
                 end
-            else
-                highlight.FillColor = Color3.fromRGB(255,0,0)
             end
-        else
-            highlight.Adornee = nil
         end
     end
 
-    updateAdornee()
-    player.CharacterAdded:Connect(updateAdornee)
-    player:GetPropertyChangedSignal("Team"):Connect(updateAdornee)
+    return target
 end
 
---// ฟังก์ชันลบ ESP
-local function removeESP(player)
-    if highlightList[player] then
-        highlightList[player]:Destroy()
-        highlightList[player] = nil
-    end
+-- UI: วาดวงกลม FOV
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = true
+FOVCircle.Radius = FOVRadius
+FOVCircle.Color = Color3.fromRGB(255,0,0)
+FOVCircle.Thickness = 2
+FOVCircle.Filled = false
+
+-- ฟังก์ชันปรับขนาด FOV (ใช้มือถือหรือปุ่มเพิ่มลด)
+local function SetFOV(size)
+    FOVRadius = size
+    FOVCircle.Radius = FOVRadius
 end
 
---// ตั้งค่า ESP สำหรับผู้เล่น
-local function setupPlayer(player)
-    createESP(player)
-end
-
---// สร้าง ESP สำหรับผู้เล่นทั้งหมดที่มีอยู่แล้ว
-for _, player in pairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then
-        setupPlayer(player)
-    end
-end
-
---// ตรวจจับผู้เล่นใหม่เข้ามาในเกม
-Players.PlayerAdded:Connect(function(player)
-    if player ~= LocalPlayer then
-        setupPlayer(player)
+-- ตัวอย่าง: ปรับ FOV ด้วยปุ่ม (+/-) (มือถืออาจปรับเป็น UI slider)
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == Enum.KeyCode.Up then
+            SetFOV(FOVRadius + 10)
+        elseif input.KeyCode == Enum.KeyCode.Down then
+            SetFOV(FOVRadius - 10)
+        end
     end
 end)
 
---// ปรับ FillTransparency และ OutlineThickness ตามระยะทุกเฟรม
+-- Update loop
 RunService.RenderStepped:Connect(function()
-    if espEnabled then
-        local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not localRoot then return end
-        for player, highlight in pairs(highlightList) do
-            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                local distance = (localRoot.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                highlight.FillTransparency = math.clamp(distance / maxDistance, 0.2, 0.8)
-                highlight.OutlineThickness = math.clamp(5 - (distance / maxDistance * 4), 1, 5)
-            end
-        end
-    end
-end)
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
---// GUI มือถือ: พับ/กาง + ลากได้ + ปุ่มเปิด/ปิด ESP
-local screenGui = Instance.new("ScreenGui")
-screenGui.ResetOnSpawn = false
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0,150,0,50)
-mainFrame.Position = UDim2.new(0,20,0,20)
-mainFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
-
--- ปุ่มพับ/กาง
-local foldButton = Instance.new("TextButton")
-foldButton.Size = UDim2.new(0,30,0,30)
-foldButton.Position = UDim2.new(1,-35,0,10)
-foldButton.BackgroundColor3 = Color3.fromRGB(100,100,100)
-foldButton.Text = "▲"
-foldButton.TextScaled = true
-foldButton.Parent = mainFrame
-
--- ปุ่มเปิด/ปิด ESP
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(1, -45, 1, 0)
-toggleButton.Position = UDim2.new(0,5,0,0)
-toggleButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
-toggleButton.TextColor3 = Color3.fromRGB(255,255,255)
-toggleButton.Text = "ESP: OFF"
-toggleButton.TextScaled = true
-toggleButton.Parent = mainFrame
-
--- ฟังก์ชันพับ/กาง
-local folded = false
-foldButton.MouseButton1Click:Connect(function()
-    folded = not folded
-    if folded then
-        mainFrame.Size = UDim2.new(0,50,0,50)
-        toggleButton.Visible = false
-        foldButton.Text = "▼"
-    else
-        mainFrame.Size = UDim2.new(0,150,0,50)
-        toggleButton.Visible = true
-        foldButton.Text = "▲"
-    end
-end)
-
--- ฟังก์ชันเปิด/ปิด ESP
-toggleButton.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    toggleButton.Text = espEnabled and "ESP: ON" or "ESP: OFF"
-
-    if espEnabled then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                setupPlayer(player)
-            end
-        end
-    else
-        for player, _ in pairs(highlightList) do
-            removeESP(player)
+    if TouchAimEnabled then
+        local target = GetClosestEnemy()
+        if target then
+            local targetPos = target.Position
+            local cameraPos = Camera.CFrame.Position
+            local direction = (targetPos - cameraPos).Unit
+            Camera.CFrame = CFrame.new(cameraPos, cameraPos + direction * 1000:Lerp(targetPos, LockSpeed))
         end
     end
 end)
