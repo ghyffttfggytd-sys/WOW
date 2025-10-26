@@ -1,8 +1,8 @@
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -10,9 +10,10 @@ local camera = Workspace.CurrentCamera
 --// Settings
 local espEnabled = true
 local lockTargetEnabled = false
-local lockRange = 100 -- ระยะล็อคเริ่มต้น
+local lockRange = 150
 local highlightList = {}
 local currentTarget = nil
+local magneticEnabled = true -- เปิด/ปิดกระสุนดูด
 
 --// GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
@@ -20,22 +21,19 @@ gui.ResetOnSpawn = false
 
 --// Menu Frame
 local menuFrame = Instance.new("Frame", gui)
-menuFrame.Size = UDim2.new(0, 220, 0, 180)
+menuFrame.Size = UDim2.new(0, 220, 0, 200)
 menuFrame.Position = UDim2.new(0.05, 0, 0.5, 0)
-menuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+menuFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 menuFrame.BorderSizePixel = 2
 menuFrame.Active = true
 menuFrame.Draggable = true
 
-local uiCorner = Instance.new("UICorner", menuFrame)
-uiCorner.CornerRadius = UDim.new(0, 10)
-
 --// Title Bar
 local title = Instance.new("TextButton", menuFrame)
-title.Size = UDim2.new(1, 0, 0, 30)
+title.Size = UDim2.new(1,0,0,30)
 title.Text = "🎯 ESP & Lock Menu (พับได้)"
-title.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundColor3 = Color3.fromRGB(255,0,0)
+title.TextColor3 = Color3.new(1,1,1)
 title.TextScaled = true
 
 local isFolded = false
@@ -46,26 +44,25 @@ title.MouseButton1Click:Connect(function()
 			obj.Visible = not isFolded
 		end
 	end
-	menuFrame.Size = isFolded and UDim2.new(0, 220, 0, 30) or UDim2.new(0, 220, 0, 180)
+	menuFrame.Size = isFolded and UDim2.new(0,220,0,30) or UDim2.new(0,220,0,200)
 end)
 
 --// ESP Button
 local espButton = Instance.new("TextButton", menuFrame)
-espButton.Size = UDim2.new(1, -20, 0, 40)
-espButton.Position = UDim2.new(0, 10, 0, 40)
+espButton.Size = UDim2.new(1,-20,0,40)
+espButton.Position = UDim2.new(0,10,0,40)
 espButton.Text = "ESP: เปิด"
-espButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-espButton.TextColor3 = Color3.new(1, 1, 1)
+espButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
+espButton.TextColor3 = Color3.new(1,1,1)
 espButton.TextScaled = true
-
 espButton.MouseButton1Click:Connect(function()
 	espEnabled = not espEnabled
 	if espEnabled then
 		espButton.Text = "ESP: เปิด"
-		espButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+		espButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
 	else
 		espButton.Text = "ESP: ปิด"
-		espButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+		espButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
 		for _, hl in pairs(highlightList) do
 			if hl and hl.Parent then hl:Destroy() end
 		end
@@ -73,47 +70,42 @@ espButton.MouseButton1Click:Connect(function()
 	end
 end)
 
---// Lock Button
+--// Lock Target Button
 local lockButton = Instance.new("TextButton", menuFrame)
-lockButton.Size = UDim2.new(1, -20, 0, 40)
-lockButton.Position = UDim2.new(0, 10, 0, 90)
+lockButton.Size = UDim2.new(1,-20,0,40)
+lockButton.Position = UDim2.new(0,10,0,90)
 lockButton.Text = "Lock Target: ปิด"
-lockButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-lockButton.TextColor3 = Color3.new(1, 1, 1)
+lockButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
+lockButton.TextColor3 = Color3.new(1,1,1)
 lockButton.TextScaled = true
-
 lockButton.MouseButton1Click:Connect(function()
 	lockTargetEnabled = not lockTargetEnabled
 	if lockTargetEnabled then
 		lockButton.Text = "Lock Target: เปิด"
-		lockButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+		lockButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
 	else
 		lockButton.Text = "Lock Target: ปิด"
-		lockButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+		lockButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
 		currentTarget = nil
 	end
 end)
 
---// ระยะล็อค (TextBox)
+--// Range TextBox
 local rangeBox = Instance.new("TextBox", menuFrame)
-rangeBox.Size = UDim2.new(1, -20, 0, 30)
-rangeBox.Position = UDim2.new(0, 10, 0, 140)
-rangeBox.PlaceholderText = "ระยะล็อค (ปัจจุบัน: "..lockRange..")"
+rangeBox.Size = UDim2.new(1,-20,0,30)
+rangeBox.Position = UDim2.new(0,10,0,140)
+rangeBox.PlaceholderText = "ระยะล็อค: "..lockRange
 rangeBox.Text = ""
 rangeBox.TextScaled = true
-rangeBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-rangeBox.TextColor3 = Color3.new(1, 1, 1)
-
+rangeBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+rangeBox.TextColor3 = Color3.new(1,1,1)
 rangeBox.FocusLost:Connect(function()
 	local val = tonumber(rangeBox.Text)
-	if val then
-		lockRange = val
-		rangeBox.PlaceholderText = "ระยะล็อค (ปัจจุบัน: "..lockRange..")"
-	end
+	if val then lockRange = val rangeBox.PlaceholderText = "ระยะล็อค: "..lockRange end
 	rangeBox.Text = ""
 end)
 
---// Highlight ระบบ
+--// ESP Function
 local function highlightPlayer(plr)
 	if not plr.Character then return end
 	local char = plr.Character
@@ -121,29 +113,29 @@ local function highlightPlayer(plr)
 
 	local hl = Instance.new("Highlight")
 	if player.Team and plr.Team == player.Team then
-		hl.FillColor = Color3.fromRGB(0, 255, 0) -- เพื่อน สีเขียว
-		hl.OutlineColor = Color3.fromRGB(0, 255, 0)
+		hl.FillColor = Color3.fromRGB(0,255,0)
+		hl.OutlineColor = Color3.fromRGB(0,255,0)
 	else
-		hl.FillColor = Color3.fromRGB(255, 0, 0) -- ศัตรู สีแดง
-		hl.OutlineColor = Color3.fromRGB(255, 0, 0)
+		hl.FillColor = Color3.fromRGB(255,0,0)
+		hl.OutlineColor = Color3.fromRGB(255,0,0)
 	end
 	hl.Parent = char
 	highlightList[char] = hl
 end
 
---// ตรวจจับ ESP ทุก 1 วินาที
 task.spawn(function()
 	while task.wait(1) do
-		if not espEnabled then continue end
-		for _, plr in pairs(Players:GetPlayers()) do
-			if plr ~= player then
-				highlightPlayer(plr)
+		if espEnabled then
+			for _, plr in pairs(Players:GetPlayers()) do
+				if plr ~= player then
+					highlightPlayer(plr)
+				end
 			end
 		end
 	end
 end)
 
---// ฟังก์ชันเช็คการมองเห็น
+--// Check visible
 local function isVisible(targetPart)
 	local origin = camera.CFrame.Position
 	local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
@@ -154,13 +146,12 @@ local function isVisible(targetPart)
 	return not result or (result.Instance and result.Instance:IsDescendantOf(targetPart.Parent))
 end
 
---// ฟังก์ชันหาศัตรูที่ใกล้สุด
+--// Find closest enemy
 local function getClosestEnemy()
 	local nearest = nil
 	local shortest = lockRange
-
 	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Team ~= player.Team then
+		if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and (plr.Team ~= player.Team) then
 			local hrp = plr.Character.HumanoidRootPart
 			local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
 			if onScreen and isVisible(hrp) then
@@ -172,20 +163,31 @@ local function getClosestEnemy()
 			end
 		end
 	end
-
 	return nearest
 end
 
---// ระบบล็อคเป้า
+--// Lock Target Smooth
 RunService.RenderStepped:Connect(function()
 	if lockTargetEnabled then
 		if not currentTarget or not currentTarget.Parent then
 			currentTarget = getClosestEnemy()
 		end
-
 		if currentTarget then
 			local targetPos = currentTarget.Position
-			camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
+			camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, targetPos), 0.15)
+		end
+	end
+end)
+
+--// Magnetic Bullet
+local BulletTemplate = ReplicatedStorage:FindFirstChild("Bullet")
+RunService.RenderStepped:Connect(function()
+	if magneticEnabled and lockTargetEnabled and currentTarget and BulletTemplate then
+		for _, bullet in pairs(workspace:GetChildren()) do
+			if bullet.Name == "Bullet" then
+				local dir = (currentTarget.Position - bullet.Position).Unit
+				bullet.Velocity = dir * 200 -- ปรับความเร็วกระสุน
+			end
 		end
 	end
 end)
