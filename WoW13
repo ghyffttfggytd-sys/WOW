@@ -1,196 +1,67 @@
 --// Services
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local camera = Workspace.CurrentCamera
 
 --// Settings
-local espEnabled = true
-local lockTargetEnabled = false
-local magneticEnabled = true
-local lockRange = 150
-local bulletSpeed = 200
-local highlightList = {}
-local currentTarget = nil
+local menuEnabled = false -- เริ่มต้นปิดเมนู
 
 --// GUI
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.ResetOnSpawn = false
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MBotMobileGUI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
---// Menu
-local menuFrame = Instance.new("Frame", gui)
-menuFrame.Size = UDim2.new(0,220,0,220)
-menuFrame.Position = UDim2.new(0.05,0,0.4,0)
-menuFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-menuFrame.BorderSizePixel = 2
-menuFrame.Active = true
-menuFrame.Draggable = true
+-- ปุ่มเปิด/ปิดเมนู
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 60, 0, 60)
+toggleButton.Position = UDim2.new(1, -70, 1, -70) -- มุมล่างขวา
+toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+toggleButton.Text = "☰"
+toggleButton.TextColor3 = Color3.fromRGB(255,255,255)
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextSize = 30
+toggleButton.Parent = screenGui
 
---// Title (พับเมนู)
-local title = Instance.new("TextButton", menuFrame)
-title.Size = UDim2.new(1,0,0,30)
-title.Text = "🎯 Menu (พับได้)"
-title.BackgroundColor3 = Color3.fromRGB(255,0,0)
-title.TextColor3 = Color3.new(1,1,1)
-title.TextScaled = true
+-- กรอบเมนู
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 200, 0, 300)
+mainFrame.Position = UDim2.new(0.5, -100, 0.5, -150)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.Visible = menuEnabled
+mainFrame.Parent = screenGui
 
-local isFolded = false
-title.MouseButton1Click:Connect(function()
-	isFolded = not isFolded
-	for _, obj in pairs(menuFrame:GetChildren()) do
-		if obj ~= title and obj:IsA("GuiObject") then
-			obj.Visible = not isFolded
-		end
-	end
-	menuFrame.Size = isFolded and UDim2.new(0,220,0,30) or UDim2.new(0,220,0,220)
-end)
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, 0, 0, 50)
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+titleLabel.Text = "M Bot Menu"
+titleLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextSize = 24
+titleLabel.Parent = mainFrame
 
---// ESP Button
-local espButton = Instance.new("TextButton", menuFrame)
-espButton.Size = UDim2.new(1,-20,0,40)
-espButton.Position = UDim2.new(0,10,0,40)
-espButton.Text = "ESP: เปิด"
-espButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-espButton.TextColor3 = Color3.new(1,1,1)
-espButton.TextScaled = true
-espButton.MouseButton1Click:Connect(function()
-	espEnabled = not espEnabled
-	if espEnabled then
-		espButton.Text = "ESP: เปิด"
-		espButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-	else
-		espButton.Text = "ESP: ปิด"
-		espButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
-		for _, hl in pairs(highlightList) do
-			if hl and hl.Parent then hl:Destroy() end
-		end
-		highlightList = {}
-	end
-end)
-
---// Lock Button
-local lockButton = Instance.new("TextButton", menuFrame)
-lockButton.Size = UDim2.new(1,-20,0,40)
-lockButton.Position = UDim2.new(0,10,0,90)
-lockButton.Text = "Lock Target: ปิด"
-lockButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
-lockButton.TextColor3 = Color3.new(1,1,1)
-lockButton.TextScaled = true
-lockButton.MouseButton1Click:Connect(function()
-	lockTargetEnabled = not lockTargetEnabled
-	if lockTargetEnabled then
-		lockButton.Text = "Lock Target: เปิด"
-		lockButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-	else
-		lockButton.Text = "Lock Target: ปิด"
-		lockButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
-		currentTarget = nil
-	end
-end)
-
---// Magnetic Button
-local magButton = Instance.new("TextButton", menuFrame)
-magButton.Size = UDim2.new(1,-20,0,40)
-magButton.Position = UDim2.new(0,10,0,140)
-magButton.Text = "Magnetic Bullet: เปิด"
-magButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-magButton.TextColor3 = Color3.new(1,1,1)
-magButton.TextScaled = true
-magButton.MouseButton1Click:Connect(function()
-	magneticEnabled = not magneticEnabled
-	if magneticEnabled then
-		magButton.Text = "Magnetic Bullet: เปิด"
-		magButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-	else
-		magButton.Text = "Magnetic Bullet: ปิด"
-		magButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
-	end
-end)
-
---// ESP Function
-local function highlightPlayer(plr)
-	if not plr.Character then return end
-	local char = plr.Character
-	if highlightList[char] then return end
-
-	local hl = Instance.new("Highlight")
-	if player.Team and plr.Team == player.Team then
-		hl.FillColor = Color3.fromRGB(0,255,0)
-		hl.OutlineColor = Color3.fromRGB(0,255,0)
-	else
-		hl.FillColor = Color3.fromRGB(255,0,0)
-		hl.OutlineColor = Color3.fromRGB(255,0,0)
-	end
-	hl.Parent = char
-	highlightList[char] = hl
+-- ฟังก์ชันสร้างปุ่มในเมนู
+local function createButton(name, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0.9, 0, 0, 40)
+    button.Position = UDim2.new(0.05, 0, 0, 50 + (#mainFrame:GetChildren()-2)*45)
+    button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Text = name
+    button.Font = Enum.Font.SourceSans
+    button.TextSize = 20
+    button.Parent = mainFrame
+    button.MouseButton1Click:Connect(callback)
 end
 
--- Update ESP ทุก 1 วินาที
-task.spawn(function()
-	while task.wait(1) do
-		if espEnabled then
-			for _, plr in pairs(Players:GetPlayers()) do
-				if plr ~= player then
-					highlightPlayer(plr)
-				end
-			end
-		end
-	end
+-- ตัวอย่างปุ่ม
+createButton("Say Hello", function()
+    print("Hello from M Bot (Mobile)!")
 end)
 
---// Check visible
-local function isVisible(part)
-	local origin = camera.CFrame.Position
-	local dir = (part.Position - origin).Unit * (part.Position - origin).Magnitude
-	local rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-	rayParams.FilterDescendantsInstances = {player.Character}
-	local result = Workspace:Raycast(origin, dir, rayParams)
-	return not result or (result.Instance and result.Instance:IsDescendantOf(part.Parent))
-end
-
---// Find closest enemy
-local function getClosestEnemy()
-	local nearest = nil
-	local shortest = lockRange
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and (plr.Team ~= player.Team) then
-			local hrp = plr.Character.HumanoidRootPart
-			local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
-			if onScreen and isVisible(hrp) then
-				local dist = (hrp.Position - camera.CFrame.Position).Magnitude
-				if dist < shortest then
-					shortest = dist
-					nearest = hrp
-				end
-			end
-		end
-	end
-	return nearest
-end
-
---// Lock Target Smooth
-RunService.RenderStepped:Connect(function()
-	if lockTargetEnabled then
-		if not currentTarget or not currentTarget.Parent then
-			currentTarget = getClosestEnemy()
-		end
-		if currentTarget then
-			camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, currentTarget.Position), 0.15)
-		end
-	end
-end)
-
---// Magnetic Bullet System
-RunService.RenderStepped:Connect(function()
-	if magneticEnabled and lockTargetEnabled and currentTarget then
-		for _, obj in pairs(Workspace:GetChildren()) do
-			if obj.Name == "Bullet" and obj:IsA("BasePart") then
-				local dir = (currentTarget.Position - obj.Position).Unit
-				obj.Velocity = dir * bulletSpeed
-			end
-		end
-	end
+-- ปุ่มเปิด/ปิดเมนู
+toggleButton.MouseButton1Click:Connect(function()
+    menuEnabled = not menuEnabled
+    mainFrame.Visible = menuEnabled
 end)
