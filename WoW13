@@ -1,74 +1,212 @@
--- Services
+-- // Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
 
--- Settings
+-- // Settings
 local espEnabled = true
+local lockEnabled = false
 local highlightList = {}
+local currentTarget = nil
+local lockRange = 200 -- ระยะล็อคเริ่มต้น
 
--- GUI
+-- // GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.ResetOnSpawn = false
 
--- เมนู GUI
+-- กล่องหลัก
 local menuFrame = Instance.new("Frame", gui)
-menuFrame.Size = UDim2.new(0, 200, 0, 100)
-menuFrame.Position = UDim2.new(0.05,0,0.6,0)
+menuFrame.Size = UDim2.new(0, 210, 0, 190)
+menuFrame.Position = UDim2.new(0.05, 0, 0.55, 0)
+menuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+menuFrame.BorderSizePixel = 2
+menuFrame.BorderColor3 = Color3.fromRGB(255, 0, 0)
 menuFrame.Active = true
 menuFrame.Draggable = true
-menuFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-menuFrame.BorderSizePixel = 2
-menuFrame.BorderColor3 = Color3.fromRGB(255,0,0)
 
-local title = Instance.new("TextLabel", menuFrame)
-title.Size = UDim2.new(1,0,0,30)
-title.Text = "🎯 ESP"
-title.TextScaled = true
-title.BackgroundColor3 = Color3.fromRGB(255,0,0)
-title.TextColor3 = Color3.new(1,1,1)
+-- แถบหัวเมนู
+local titleBar = Instance.new("TextButton", menuFrame)
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.Text = "✔️ ESP + Lock Menu"
+titleBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+titleBar.TextColor3 = Color3.new(1, 1, 1)
+titleBar.TextScaled = true
+
+-- กลุ่มเนื้อหา (จะพับได้)
+local contentFrame = Instance.new("Frame", menuFrame)
+contentFrame.Size = UDim2.new(1, 0, 1, -30)
+contentFrame.Position = UDim2.new(0, 0, 0, 30)
+contentFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+contentFrame.BorderSizePixel = 0
 
 -- ปุ่มเปิด/ปิด ESP
-local espButton = Instance.new("TextButton", menuFrame)
-espButton.Size = UDim2.new(1,-20,0,40)
-espButton.Position = UDim2.new(0,10,0,40)
+local espButton = Instance.new("TextButton", contentFrame)
+espButton.Size = UDim2.new(1, -20, 0, 40)
+espButton.Position = UDim2.new(0, 10, 0, 10)
 espButton.Text = "ESP: เปิด"
-espButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-espButton.TextColor3 = Color3.new(1,1,1)
+espButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+espButton.TextColor3 = Color3.new(1, 1, 1)
+espButton.TextScaled = true
 
 espButton.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    if espEnabled then
-        espButton.Text = "ESP: เปิด"
-        espButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-    else
-        espButton.Text = "ESP: ปิด"
-        espButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
-        -- ลบ Highlight ทั้งหมด
-        for _,hl in pairs(highlightList) do
-            if hl and hl.Parent then hl:Destroy() end
-        end
-        highlightList = {}
-    end
+	espEnabled = not espEnabled
+	if espEnabled then
+		espButton.Text = "ESP: เปิด"
+		espButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+	else
+		espButton.Text = "ESP: ปิด"
+		espButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+		for _, hl in pairs(highlightList) do
+			if hl and hl.Parent then hl:Destroy() end
+		end
+		highlightList = {}
+	end
 end)
 
--- ฟังก์ชัน Highlight ศัตรู
+-- ปุ่มเปิด/ปิด Lock Target
+local lockButton = Instance.new("TextButton", contentFrame)
+lockButton.Size = UDim2.new(1, -20, 0, 40)
+lockButton.Position = UDim2.new(0, 10, 0, 60)
+lockButton.Text = "Lock Target: ปิด"
+lockButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+lockButton.TextColor3 = Color3.new(1, 1, 1)
+lockButton.TextScaled = true
+
+lockButton.MouseButton1Click:Connect(function()
+	lockEnabled = not lockEnabled
+	if lockEnabled then
+		lockButton.Text = "Lock Target: เปิด"
+		lockButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+	else
+		lockButton.Text = "Lock Target: ปิด"
+		lockButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+		currentTarget = nil
+	end
+end)
+
+-- แถบปรับระยะล็อคเป้า
+local rangeLabel = Instance.new("TextLabel", contentFrame)
+rangeLabel.Size = UDim2.new(1, -20, 0, 20)
+rangeLabel.Position = UDim2.new(0, 10, 0, 110)
+rangeLabel.Text = "ระยะล็อค: " .. lockRange
+rangeLabel.TextColor3 = Color3.new(1, 1, 1)
+rangeLabel.BackgroundTransparency = 1
+rangeLabel.TextScaled = true
+
+local rangeSlider = Instance.new("TextButton", contentFrame)
+rangeSlider.Size = UDim2.new(1, -20, 0, 30)
+rangeSlider.Position = UDim2.new(0, 10, 0, 135)
+rangeSlider.Text = "⇄ ปัดเพื่อปรับระยะ"
+rangeSlider.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+rangeSlider.TextColor3 = Color3.new(1, 1, 1)
+rangeSlider.TextScaled = true
+
+-- ปัดเพื่อปรับระยะ
+local touching = false
+rangeSlider.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch then touching = true end
+end)
+rangeSlider.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch then touching = false end
+end)
+
+UserInputService.TouchMoved:Connect(function(input)
+	if touching then
+		local posX = input.Position.X
+		lockRange = math.clamp((posX % 400), 50, 400) -- ระหว่าง 50–400
+		rangeLabel.Text = "ระยะล็อค: " .. math.floor(lockRange)
+	end
+end)
+
+-- ปุ่มพับหน้าจอ (หัวข้อ)
+local folded = false
+titleBar.MouseButton1Click:Connect(function()
+	folded = not folded
+	if folded then
+		contentFrame.Visible = false
+		titleBar.Text = "❌ เปิดเมนู"
+		menuFrame.Size = UDim2.new(0, 210, 0, 30)
+	else
+		contentFrame.Visible = true
+		titleBar.Text = "✔️ ESP + Lock Menu"
+		menuFrame.Size = UDim2.new(0, 210, 0, 190)
+	end
+end)
+
+-- // ฟังก์ชัน Highlight
 local function highlightEnemy(character)
-    if highlightList[character] then return end
-    local hl = Instance.new("Highlight")
-    hl.FillColor = Color3.fromRGB(255,0,0)
-    hl.OutlineColor = Color3.fromRGB(255,0,0)
-    hl.Parent = character
-    highlightList[character] = hl
+	if highlightList[character] then return end
+	local hl = Instance.new("Highlight")
+	hl.FillColor = Color3.fromRGB(255, 0, 0)
+	hl.OutlineColor = Color3.fromRGB(255, 0, 0)
+	hl.Parent = character
+	highlightList[character] = hl
 end
 
--- Loop ตรวจจับศัตรูและ Highlight
+-- // ตรวจจับผู้เล่นใหม่
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function(char)
+		if espEnabled then
+			task.wait(1)
+			highlightEnemy(char)
+		end
+	end)
+end)
+
+-- // ตรวจสอบว่ามีสิ่งกีดขวางหรือไม่
+local function isVisible(char)
+	local head = char:FindFirstChild("Head")
+	if not head then return false end
+	local origin = camera.CFrame.Position
+	local direction = (head.Position - origin)
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = {player.Character}
+	params.FilterType = Enum.RaycastFilterType.Blacklist
+
+	local result = Workspace:Raycast(origin, direction, params)
+	if result then
+		return result.Instance:IsDescendantOf(char)
+	end
+	return false
+end
+
+-- // หาเป้าหมายที่ใกล้ที่สุด
+local function getClosestVisibleEnemy()
+	local nearest, shortest = nil, math.huge
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Character and plr.Character:FindFirstChild("Head") then
+			local char = plr.Character
+			if isVisible(char) then
+				local head = char.Head
+				local dist = (head.Position - camera.CFrame.Position).Magnitude
+				if dist < lockRange and dist < shortest then
+					shortest = dist
+					nearest = char
+				end
+			end
+		end
+	end
+	return nearest
+end
+
+-- // Loop หลัก
 RunService.RenderStepped:Connect(function()
-    if not espEnabled then return end
-    for _,plr in pairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character then
-            highlightEnemy(plr.Character)
-        end
-    end
+	if espEnabled then
+		for _, plr in pairs(Players:GetPlayers()) do
+			if plr ~= player and plr.Character then
+				highlightEnemy(plr.Character)
+			end
+		end
+	end
+
+	if lockEnabled then
+		currentTarget = getClosestVisibleEnemy()
+		if currentTarget and currentTarget:FindFirstChild("Head") then
+			camera.CFrame = CFrame.new(camera.CFrame.Position, currentTarget.Head.Position)
+		end
+	end
 end)
