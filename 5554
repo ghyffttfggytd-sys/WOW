@@ -1,146 +1,124 @@
 --// Services
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 
 --// Settings
-local espEnabled = true -- เปิด/ปิด ESP
-local enemyColor = Color3.fromRGB(255,0,0) -- สีศัตรู
+local espEnabled = false
+local teamColorEnabled = true
+local highlightList = {}
 
---// GUI
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.ResetOnSpawn = false
-
---// Main Frame
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 180, 0, 70)
-Frame.Position = UDim2.new(0, 20, 0, 20)
-Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Frame.BorderSizePixel = 0
-Frame.Active = true
-Frame.Draggable = true
-Frame.Parent = ScreenGui
-
-local FrameCorner = Instance.new("UICorner")
-FrameCorner.CornerRadius = UDim.new(0, 15)
-FrameCorner.Parent = Frame
-
---// Toggle ESP Button
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(1, -10, 0.6, -10)
-ToggleButton.Position = UDim2.new(0, 5, 0, 5)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-ToggleButton.BorderSizePixel = 0
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Text = "ESP: ON"
-ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.TextScaled = true
-ToggleButton.Parent = Frame
-
-local ButtonCorner = Instance.new("UICorner")
-ButtonCorner.CornerRadius = UDim.new(0, 12)
-ButtonCorner.Parent = ToggleButton
-
---// Expand/Collapse Button
-local ExpandButton = Instance.new("TextButton")
-ExpandButton.Size = UDim2.new(0, 30, 0, 30)
-ExpandButton.Position = UDim2.new(1, -35, 1, -35)
-ExpandButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-ExpandButton.Text = "+"
-ExpandButton.Font = Enum.Font.SourceSansBold
-ExpandButton.TextScaled = true
-ExpandButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ExpandButton.Parent = Frame
-
-local ExpandCorner = Instance.new("UICorner")
-ExpandCorner.CornerRadius = UDim.new(0, 10)
-ExpandCorner.Parent = ExpandButton
-
-local expanded = true
-ExpandButton.MouseButton1Click:Connect(function()
-    expanded = not expanded
-    local goal = {}
-    if expanded then
-        goal.Size = UDim2.new(0, 180, 0, 70)
-    else
-        goal.Size = UDim2.new(0, 50, 0, 50)
-    end
-    TweenService:Create(Frame, TweenInfo.new(0.3), goal):Play()
-end)
-
---// Function to update button color (glow effect)
-local function updateButtonColor()
-    if espEnabled then
-        local hue = tick()%5 / 5
-        local color = Color3.fromHSV(hue,1,1)
-        ToggleButton.BackgroundColor3 = color
-    else
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    end
-end
-
---// Toggle ESP
-ToggleButton.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    ToggleButton.Text = espEnabled and "ESP: ON" or "ESP: OFF"
-    updateButtonColor()
-    
-    if not espEnabled then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player.Character and player.Character:FindFirstChild("ESPHighlight") then
-                player.Character.ESPHighlight:Destroy()
-            end
-        end
-    end
-end)
-
---// Update button color continuously
-RunService.RenderStepped:Connect(updateButtonColor)
-
---// ฟังก์ชันสร้าง Highlight
+--// ฟังก์ชันสร้าง ESP
 local function createESP(player)
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        if not player.Character:FindFirstChild("ESPHighlight") then
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "ESPHighlight"
-            highlight.Adornee = player.Character
-            highlight.FillColor = enemyColor
-            highlight.OutlineColor = Color3.fromRGB(0,0,0)
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Parent = player.Character
+    if highlightList[player] then return highlightList[player] end
+    if not player.Character then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = player.Character
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Parent = workspace
+
+    -- สีตามทีม
+    if teamColorEnabled then
+        if player.Team == LocalPlayer.Team then
+            highlight.FillColor = Color3.fromRGB(0,255,0)
+        else
+            highlight.FillColor = Color3.fromRGB(255,0,0)
         end
+    else
+        highlight.FillColor = Color3.fromRGB(255,0,0)
     end
+
+    highlightList[player] = highlight
+    return highlight
 end
 
--- ฟังก์ชันลบ Highlight
+--// ฟังก์ชันลบ ESP
 local function removeESP(player)
-    if player.Character and player.Character:FindFirstChild("ESPHighlight") then
-        player.Character.ESPHighlight:Destroy()
+    if highlightList[player] then
+        highlightList[player]:Destroy()
+        highlightList[player] = nil
     end
 end
 
---// ตรวจสอบผู้เล่นทุกเฟรม
-RunService.RenderStepped:Connect(function()
-    if not espEnabled then return end
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            if player.TeamColor == BrickColor.new("Bright red") then
-                createESP(player)
-            else
-                removeESP(player)
-            end
-        end
-    end
-end)
-
---// ตรวจจับผู้เล่นใหม่เข้าร่วมเกม
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        if player.TeamColor == BrickColor.new("Bright red") then
+--// ตรวจสอบผู้เล่นใหม่และสร้าง ESP
+local function setupPlayer(player)
+    -- สร้าง ESP เมื่อผู้เล่นมีตัวละคร
+    player.CharacterAdded:Connect(function(character)
+        if espEnabled then
             createESP(player)
         end
     end)
+    -- ถ้ามีตัวละครแล้วให้สร้าง ESP ทันที
+    if player.Character then
+        if espEnabled then
+            createESP(player)
+        end
+    end
+end
+
+--// ตั้งค่า ESP สำหรับผู้เล่นทั้งหมดที่มีอยู่
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        setupPlayer(player)
+    end
+end
+
+--// ตรวจจับผู้เล่นใหม่เข้ามาในเกม
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        setupPlayer(player)
+    end
+end)
+
+--// อัพเดทสี ESP ทุก 0.5 วินาที
+spawn(function()
+    while true do
+        if espEnabled then
+            for player, highlight in pairs(highlightList) do
+                if player.Character and teamColorEnabled then
+                    if player.Team == LocalPlayer.Team then
+                        highlight.FillColor = Color3.fromRGB(0,255,0)
+                    else
+                        highlight.FillColor = Color3.fromRGB(255,0,0)
+                    end
+                end
+            end
+        end
+        wait(0.5)
+    end
+end)
+
+--// GUI มือถือ (ปุ่มเปิด/ปิด ESP)
+local screenGui = Instance.new("ScreenGui")
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0,120,0,50)
+toggleButton.Position = UDim2.new(0,20,0,20)
+toggleButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+toggleButton.TextColor3 = Color3.fromRGB(255,255,255)
+toggleButton.Text = "ESP: OFF"
+toggleButton.Parent = screenGui
+toggleButton.AutoButtonColor = true
+toggleButton.TextScaled = true
+
+toggleButton.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    toggleButton.Text = espEnabled and "ESP: ON" or "ESP: OFF"
+
+    if espEnabled then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                createESP(player)
+            end
+        end
+    else
+        for player, _ in pairs(highlightList) do
+            removeESP(player)
+        end
+    end
 end)
