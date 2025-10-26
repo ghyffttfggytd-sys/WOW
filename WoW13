@@ -2,7 +2,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -10,11 +9,11 @@ local camera = Workspace.CurrentCamera
 --// Settings
 local espEnabled = true
 local lockTargetEnabled = false
+local magneticEnabled = true
 local lockRange = 150
+local bulletSpeed = 200
 local highlightList = {}
 local currentTarget = nil
-local magneticEnabled = true
-local bulletSpeed = 200 -- ปรับความเร็วกระสุนได้
 
 --// GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
@@ -22,8 +21,8 @@ gui.ResetOnSpawn = false
 
 --// Menu
 local menuFrame = Instance.new("Frame", gui)
-menuFrame.Size = UDim2.new(0, 220, 0, 220)
-menuFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+menuFrame.Size = UDim2.new(0,220,0,220)
+menuFrame.Position = UDim2.new(0.05,0,0.4,0)
 menuFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 menuFrame.BorderSizePixel = 2
 menuFrame.Active = true
@@ -71,7 +70,7 @@ espButton.MouseButton1Click:Connect(function()
 	end
 end)
 
---// Lock Target Button
+--// Lock Button
 local lockButton = Instance.new("TextButton", menuFrame)
 lockButton.Size = UDim2.new(1,-20,0,40)
 lockButton.Position = UDim2.new(0,10,0,90)
@@ -91,37 +90,22 @@ lockButton.MouseButton1Click:Connect(function()
 	end
 end)
 
---// Range TextBox
-local rangeBox = Instance.new("TextBox", menuFrame)
-rangeBox.Size = UDim2.new(1,-20,0,30)
-rangeBox.Position = UDim2.new(0,10,0,140)
-rangeBox.PlaceholderText = "ระยะล็อค: "..lockRange
-rangeBox.Text = ""
-rangeBox.TextScaled = true
-rangeBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
-rangeBox.TextColor3 = Color3.new(1,1,1)
-rangeBox.FocusLost:Connect(function()
-	local val = tonumber(rangeBox.Text)
-	if val then lockRange = val rangeBox.PlaceholderText = "ระยะล็อค: "..lockRange end
-	rangeBox.Text = ""
-end)
-
 --// Magnetic Button
-local magneticButton = Instance.new("TextButton", menuFrame)
-magneticButton.Size = UDim2.new(1,-20,0,30)
-magneticButton.Position = UDim2.new(0,10,0,180)
-magneticButton.Text = "Magnetic Bullet: เปิด"
-magneticButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
-magneticButton.TextColor3 = Color3.new(1,1,1)
-magneticButton.TextScaled = true
-magneticButton.MouseButton1Click:Connect(function()
+local magButton = Instance.new("TextButton", menuFrame)
+magButton.Size = UDim2.new(1,-20,0,40)
+magButton.Position = UDim2.new(0,10,0,140)
+magButton.Text = "Magnetic Bullet: เปิด"
+magButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
+magButton.TextColor3 = Color3.new(1,1,1)
+magButton.TextScaled = true
+magButton.MouseButton1Click:Connect(function()
 	magneticEnabled = not magneticEnabled
 	if magneticEnabled then
-		magneticButton.Text = "Magnetic Bullet: เปิด"
-		magneticButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
+		magButton.Text = "Magnetic Bullet: เปิด"
+		magButton.BackgroundColor3 = Color3.fromRGB(0,150,0)
 	else
-		magneticButton.Text = "Magnetic Bullet: ปิด"
-		magneticButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
+		magButton.Text = "Magnetic Bullet: ปิด"
+		magButton.BackgroundColor3 = Color3.fromRGB(150,0,0)
 	end
 end)
 
@@ -133,16 +117,17 @@ local function highlightPlayer(plr)
 
 	local hl = Instance.new("Highlight")
 	if player.Team and plr.Team == player.Team then
-		hl.FillColor = Color3.fromRGB(0,255,0) -- เพื่อน
+		hl.FillColor = Color3.fromRGB(0,255,0)
 		hl.OutlineColor = Color3.fromRGB(0,255,0)
 	else
-		hl.FillColor = Color3.fromRGB(255,0,0) -- ศัตรู
+		hl.FillColor = Color3.fromRGB(255,0,0)
 		hl.OutlineColor = Color3.fromRGB(255,0,0)
 	end
 	hl.Parent = char
 	highlightList[char] = hl
 end
 
+-- Update ESP ทุก 1 วินาที
 task.spawn(function()
 	while task.wait(1) do
 		if espEnabled then
@@ -156,14 +141,14 @@ task.spawn(function()
 end)
 
 --// Check visible
-local function isVisible(targetPart)
+local function isVisible(part)
 	local origin = camera.CFrame.Position
-	local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
-	local raycastParams = RaycastParams.new()
-	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-	raycastParams.FilterDescendantsInstances = {player.Character}
-	local result = Workspace:Raycast(origin, direction, raycastParams)
-	return not result or (result.Instance and result.Instance:IsDescendantOf(targetPart.Parent))
+	local dir = (part.Position - origin).Unit * (part.Position - origin).Magnitude
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+	rayParams.FilterDescendantsInstances = {player.Character}
+	local result = Workspace:Raycast(origin, dir, rayParams)
+	return not result or (result.Instance and result.Instance:IsDescendantOf(part.Parent))
 end
 
 --// Find closest enemy
@@ -193,20 +178,18 @@ RunService.RenderStepped:Connect(function()
 			currentTarget = getClosestEnemy()
 		end
 		if currentTarget then
-			local targetPos = currentTarget.Position
-			camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, targetPos), 0.15)
+			camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, currentTarget.Position), 0.15)
 		end
 	end
 end)
 
 --// Magnetic Bullet System
--- สมมติ Part กระสุนชื่อ "Bullet" อยู่ใน Workspace
 RunService.RenderStepped:Connect(function()
 	if magneticEnabled and lockTargetEnabled and currentTarget then
-		for _, bullet in pairs(Workspace:GetChildren()) do
-			if bullet.Name == "Bullet" and bullet:IsA("BasePart") then
-				local dir = (currentTarget.Position - bullet.Position).Unit
-				bullet.Velocity = dir * bulletSpeed
+		for _, obj in pairs(Workspace:GetChildren()) do
+			if obj.Name == "Bullet" and obj:IsA("BasePart") then
+				local dir = (currentTarget.Position - obj.Position).Unit
+				obj.Velocity = dir * bulletSpeed
 			end
 		end
 	end
