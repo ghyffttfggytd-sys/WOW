@@ -1,0 +1,97 @@
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+--// Settings
+local espEnabled = true
+local refreshRate = 1 -- อัปเดตทุกๆ 1 วินาที
+local highlightList = {}
+
+--// GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 150)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+MainFrame.Active = true
+MainFrame.Draggable = true -- ลากได้
+
+-- ปุ่มเปิด/ปิด ESP
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 120, 0, 40)
+ToggleButton.Position = UDim2.new(0, 10, 0, 10)
+ToggleButton.Text = "ESP: ON"
+ToggleButton.Parent = MainFrame
+
+-- ปุ่มพับ UI
+local CollapseButton = Instance.new("TextButton")
+CollapseButton.Size = UDim2.new(0, 120, 0, 40)
+CollapseButton.Position = UDim2.new(0, 10, 0, 60)
+CollapseButton.Text = "Collapse"
+CollapseButton.Parent = MainFrame
+
+local collapsed = false
+CollapseButton.MouseButton1Click:Connect(function()
+    collapsed = not collapsed
+    if collapsed then
+        MainFrame.Size = UDim2.new(0, 120, 0, 40)
+    else
+        MainFrame.Size = UDim2.new(0, 250, 0, 150)
+    end
+end)
+
+ToggleButton.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    ToggleButton.Text = "ESP: " .. (espEnabled and "ON" or "OFF")
+end)
+
+--// ESP Function
+local function createESP(player)
+    if highlightList[player] then return end
+    if player == LocalPlayer then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Parent = player.Character or player
+    highlight.Adornee = player.Character
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlightList[player] = highlight
+end
+
+local function removeESP(player)
+    if highlightList[player] then
+        highlightList[player]:Destroy()
+        highlightList[player] = nil
+    end
+end
+
+-- อัปเดต ESP ทุก 1 วินาที
+spawn(function()
+    while true do
+        if espEnabled then
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    local isSameTeam = player.Team == LocalPlayer.Team
+                    createESP(player)
+                    highlightList[player].FillColor = isSameTeam and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            end
+        else
+            for _, player in pairs(Players:GetPlayers()) do
+                removeESP(player)
+            end
+        end
+        wait(refreshRate)
+    end
+end)
