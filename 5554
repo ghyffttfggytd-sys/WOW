@@ -2,11 +2,9 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
-local camera = Workspace.CurrentCamera
 
 --// Settings
 local espEnabled = true
@@ -26,7 +24,6 @@ Frame.Active = true
 Frame.Draggable = true
 Frame.Parent = ScreenGui
 
---// Frame Round Corner
 local FrameCorner = Instance.new("UICorner")
 FrameCorner.CornerRadius = UDim.new(0, 15)
 FrameCorner.Parent = Frame
@@ -74,10 +71,9 @@ ExpandButton.MouseButton1Click:Connect(function()
     TweenService:Create(Frame, TweenInfo.new(0.3), goal):Play()
 end)
 
---// Function to update button color with "glow" effect
+--// Function to update button color (glow effect)
 local function updateButtonColor()
     if espEnabled then
-        -- ไล่สีแดงเรืองแสง
         local hue = tick()%5 / 5
         local color = Color3.fromHSV(hue,1,1)
         ToggleButton.BackgroundColor3 = color
@@ -101,9 +97,7 @@ ToggleButton.MouseButton1Click:Connect(function()
 end)
 
 --// Update button color continuously
-RunService.RenderStepped:Connect(function()
-    updateButtonColor()
-end)
+RunService.RenderStepped:Connect(updateButtonColor)
 
 --// ESP Loop
 RunService.RenderStepped:Connect(function()
@@ -112,19 +106,28 @@ RunService.RenderStepped:Connect(function()
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= player and plr.Team ~= player.Team then
             local character = plr.Character
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                if not highlightList[plr] then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Adornee = character
-                    highlight.FillColor = Color3.fromRGB(255,0,0)
-                    highlight.OutlineColor = Color3.fromRGB(255,255,255)
-                    highlight.Parent = character
-                    highlightList[plr] = highlight
+            if character then
+                -- หา Adornee ที่เหมาะสม
+                local targetPart = character:FindFirstChild("HumanoidRootPart") 
+                                or character:FindFirstChild("UpperTorso")
+                                or character:FindFirstChild("LowerTorso")
+                
+                if targetPart then
+                    if not highlightList[plr] then
+                        local highlight = Instance.new("Highlight")
+                        highlight.Adornee = character -- ให้ Highlight ทั้ง Model
+                        highlight.FillColor = Color3.fromRGB(255,0,0)
+                        highlight.OutlineColor = Color3.fromRGB(255,255,255)
+                        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                        highlight.Parent = character
+                        highlightList[plr] = highlight
+                    end
                 end
             end
         end
     end
     
+    -- ลบ Highlight ของผู้เล่นที่ตายหรือเปลี่ยนทีม
     for plr, highlight in pairs(highlightList) do
         if not plr.Parent or plr.Team == player.Team then
             highlight:Destroy()
