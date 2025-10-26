@@ -1,0 +1,134 @@
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+--// Settings
+local espEnabled = true
+local highlightList = {}
+
+--// GUI
+local ScreenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+ScreenGui.ResetOnSpawn = false
+
+--// Main Frame
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 180, 0, 70)
+Frame.Position = UDim2.new(0, 20, 0, 20)
+Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+
+--// Frame Round Corner
+local FrameCorner = Instance.new("UICorner")
+FrameCorner.CornerRadius = UDim.new(0, 15)
+FrameCorner.Parent = Frame
+
+--// Toggle ESP Button
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(1, -10, 0.6, -10)
+ToggleButton.Position = UDim2.new(0, 5, 0, 5)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+ToggleButton.BorderSizePixel = 0
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.Text = "ESP: ON"
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.TextScaled = true
+ToggleButton.Parent = Frame
+
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 12)
+ButtonCorner.Parent = ToggleButton
+
+--// Expand/Collapse Button
+local ExpandButton = Instance.new("TextButton")
+ExpandButton.Size = UDim2.new(0, 30, 0, 30)
+ExpandButton.Position = UDim2.new(1, -35, 1, -35)
+ExpandButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+ExpandButton.Text = "+"
+ExpandButton.Font = Enum.Font.SourceSansBold
+ExpandButton.TextScaled = true
+ExpandButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExpandButton.Parent = Frame
+
+local ExpandCorner = Instance.new("UICorner")
+ExpandCorner.CornerRadius = UDim.new(0, 10)
+ExpandCorner.Parent = ExpandButton
+
+local expanded = true
+ExpandButton.MouseButton1Click:Connect(function()
+    expanded = not expanded
+    local goal = {}
+    if expanded then
+        goal.Size = UDim2.new(0, 180, 0, 70)
+    else
+        goal.Size = UDim2.new(0, 50, 0, 50)
+    end
+    TweenService:Create(Frame, TweenInfo.new(0.3), goal):Play()
+end)
+
+--// Function to update button color with "glow" effect
+local function updateButtonColor()
+    if espEnabled then
+        -- ไล่สีแดงเรืองแสง
+        local hue = tick()%5 / 5
+        local color = Color3.fromHSV(hue,1,1)
+        ToggleButton.BackgroundColor3 = color
+    else
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end
+end
+
+--// Toggle ESP
+ToggleButton.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    ToggleButton.Text = espEnabled and "ESP: ON" or "ESP: OFF"
+    updateButtonColor()
+    
+    if not espEnabled then
+        for _, highlight in pairs(highlightList) do
+            highlight:Destroy()
+        end
+        highlightList = {}
+    end
+end)
+
+--// Update button color continuously
+RunService.RenderStepped:Connect(function()
+    updateButtonColor()
+end)
+
+--// ESP Loop
+RunService.RenderStepped:Connect(function()
+    if not espEnabled then return end
+    
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Team ~= player.Team then
+            local character = plr.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                if not highlightList[plr] then
+                    local highlight = Instance.new("Highlight")
+                    highlight.Adornee = character
+                    highlight.FillColor = Color3.fromRGB(255,0,0)
+                    highlight.OutlineColor = Color3.fromRGB(255,255,255)
+                    highlight.Parent = character
+                    highlightList[plr] = highlight
+                end
+            end
+        end
+    end
+    
+    for plr, highlight in pairs(highlightList) do
+        if not plr.Parent or plr.Team == player.Team then
+            highlight:Destroy()
+            highlightList[plr] = nil
+        end
+    end
+end)
