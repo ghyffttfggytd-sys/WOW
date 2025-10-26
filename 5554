@@ -1,17 +1,16 @@
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 
-local player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 
 --// Settings
-local espEnabled = true
-local highlightList = {}
+local espEnabled = true -- เปิด/ปิด ESP
+local enemyColor = Color3.fromRGB(255,0,0) -- สีศัตรู
 
 --// GUI
-local ScreenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 ScreenGui.ResetOnSpawn = false
 
 --// Main Frame
@@ -89,49 +88,59 @@ ToggleButton.MouseButton1Click:Connect(function()
     updateButtonColor()
     
     if not espEnabled then
-        for _, highlight in pairs(highlightList) do
-            highlight:Destroy()
+        for _, player in pairs(Players:GetPlayers()) do
+            if player.Character and player.Character:FindFirstChild("ESPHighlight") then
+                player.Character.ESPHighlight:Destroy()
+            end
         end
-        highlightList = {}
     end
 end)
 
 --// Update button color continuously
 RunService.RenderStepped:Connect(updateButtonColor)
 
---// ESP Loop
+--// ฟังก์ชันสร้าง Highlight
+local function createESP(player)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        if not player.Character:FindFirstChild("ESPHighlight") then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "ESPHighlight"
+            highlight.Adornee = player.Character
+            highlight.FillColor = enemyColor
+            highlight.OutlineColor = Color3.fromRGB(0,0,0)
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Parent = player.Character
+        end
+    end
+end
+
+-- ฟังก์ชันลบ Highlight
+local function removeESP(player)
+    if player.Character and player.Character:FindFirstChild("ESPHighlight") then
+        player.Character.ESPHighlight:Destroy()
+    end
+end
+
+--// ตรวจสอบผู้เล่นทุกเฟรม
 RunService.RenderStepped:Connect(function()
     if not espEnabled then return end
-    
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Team ~= player.Team then
-            local character = plr.Character
-            if character then
-                -- หา Adornee ที่เหมาะสม
-                local targetPart = character:FindFirstChild("HumanoidRootPart") 
-                                or character:FindFirstChild("UpperTorso")
-                                or character:FindFirstChild("LowerTorso")
-                
-                if targetPart then
-                    if not highlightList[plr] then
-                        local highlight = Instance.new("Highlight")
-                        highlight.Adornee = character -- ให้ Highlight ทั้ง Model
-                        highlight.FillColor = Color3.fromRGB(255,0,0)
-                        highlight.OutlineColor = Color3.fromRGB(255,255,255)
-                        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                        highlight.Parent = character
-                        highlightList[plr] = highlight
-                    end
-                end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if player.TeamColor == BrickColor.new("Bright red") then
+                createESP(player)
+            else
+                removeESP(player)
             end
         end
     end
-    
-    -- ลบ Highlight ของผู้เล่นที่ตายหรือเปลี่ยนทีม
-    for plr, highlight in pairs(highlightList) do
-        if not plr.Parent or plr.Team == player.Team then
-            highlight:Destroy()
-            highlightList[plr] = nil
+end)
+
+--// ตรวจจับผู้เล่นใหม่เข้าร่วมเกม
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        if player.TeamColor == BrickColor.new("Bright red") then
+            createESP(player)
         end
-    end
+    end)
 end)
