@@ -2,13 +2,14 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
+local camera = Workspace.CurrentCamera
 
 --// Settings
 local espEnabled = true
 local lockEnabled = false
-local lockDistance = 100 -- ระยะล็อคเริ่มต้น
+local lockDistance = 150 -- ระยะล็อคเป้าเริ่มต้น
 local highlightList = {}
 local currentTarget = nil
 
@@ -16,7 +17,6 @@ local currentTarget = nil
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.ResetOnSpawn = false
 
--- พื้นที่หลักของเมนู
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 200, 0, 180)
 menuFrame.Position = UDim2.new(0.05, 0, 0.6, 0)
@@ -26,7 +26,7 @@ menuFrame.BorderColor3 = Color3.fromRGB(0, 255, 0)
 menuFrame.Active = true
 menuFrame.Draggable = true
 
--- ปุ่มพับ/ขยายเมนู
+-- ปุ่มพับเมนู
 local toggleButton = Instance.new("TextButton", menuFrame)
 toggleButton.Size = UDim2.new(1, 0, 0, 30)
 toggleButton.Text = "❌ ปิดเมนู"
@@ -34,14 +34,13 @@ toggleButton.TextColor3 = Color3.new(1, 1, 1)
 toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
 toggleButton.TextScaled = true
 
--- กล่องเมนูที่พับได้
 local contentFrame = Instance.new("Frame", menuFrame)
 contentFrame.Size = UDim2.new(1, 0, 1, -30)
 contentFrame.Position = UDim2.new(0, 0, 0, 30)
 contentFrame.BackgroundTransparency = 1
 contentFrame.ClipsDescendants = true
 
--- ปุ่มเปิดปิด ESP
+-- ปุ่มเปิด/ปิด ESP
 local espButton = Instance.new("TextButton", contentFrame)
 espButton.Size = UDim2.new(1, -20, 0, 40)
 espButton.Position = UDim2.new(0, 10, 0, 10)
@@ -50,7 +49,7 @@ espButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 espButton.TextColor3 = Color3.new(1, 1, 1)
 espButton.TextScaled = true
 
--- ปุ่มเปิดปิด Lock Target
+-- ปุ่มเปิด/ปิดล็อคเป้า
 local lockButton = Instance.new("TextButton", contentFrame)
 lockButton.Size = UDim2.new(1, -20, 0, 40)
 lockButton.Position = UDim2.new(0, 10, 0, 60)
@@ -59,17 +58,17 @@ lockButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
 lockButton.TextColor3 = Color3.new(1, 1, 1)
 lockButton.TextScaled = true
 
--- กล่องพิมพ์ระยะล็อคเป้า
+-- กล่องพิมพ์ระยะล็อค
 local rangeBox = Instance.new("TextBox", contentFrame)
 rangeBox.Size = UDim2.new(1, -20, 0, 30)
 rangeBox.Position = UDim2.new(0, 10, 0, 110)
-rangeBox.PlaceholderText = "ระยะล็อคเป้า (เช่น 100)"
+rangeBox.PlaceholderText = "ระยะล็อคเป้า (เริ่มต้น 150)"
 rangeBox.Text = tostring(lockDistance)
 rangeBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 rangeBox.TextColor3 = Color3.new(1, 1, 1)
 rangeBox.TextScaled = true
 
--- ปุ่มพับเมนู
+-- พับเมนู
 local menuOpen = true
 toggleButton.MouseButton1Click:Connect(function()
 	menuOpen = not menuOpen
@@ -91,14 +90,14 @@ espButton.MouseButton1Click:Connect(function()
 	else
 		espButton.Text = "ESP: ปิด"
 		espButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-		for _,hl in pairs(highlightList) do
+		for _, hl in pairs(highlightList) do
 			if hl and hl.Parent then hl:Destroy() end
 		end
 		highlightList = {}
 	end
 end)
 
--- ปุ่ม Lock Target
+-- ปุ่มล็อคเป้า
 lockButton.MouseButton1Click:Connect(function()
 	lockEnabled = not lockEnabled
 	if lockEnabled then
@@ -110,7 +109,7 @@ lockButton.MouseButton1Click:Connect(function()
 	end
 end)
 
--- เปลี่ยนระยะล็อค
+-- เปลี่ยนค่าระยะล็อค
 rangeBox.FocusLost:Connect(function()
 	local num = tonumber(rangeBox.Text)
 	if num and num > 0 then
@@ -120,8 +119,21 @@ rangeBox.FocusLost:Connect(function()
 	end
 end)
 
--- ฟังก์ชันสร้าง ESP
+-- ฟังก์ชันตรวจว่าเป็นเพื่อนหรือศัตรู
+local function isEnemy(plr)
+	if not plr or plr == player then return false end
+	if plr.Team and player.Team and plr.Team == player.Team then
+		return false
+	end
+	if plr.TeamColor and player.TeamColor and plr.TeamColor == player.TeamColor then
+		return false
+	end
+	return true
+end
+
+-- สร้าง ESP
 local function createESP(character, color)
+	if not character:FindFirstChild("HumanoidRootPart") then return end
 	if highlightList[character] then return end
 	local hl = Instance.new("Highlight")
 	hl.FillColor = color
@@ -130,7 +142,7 @@ local function createESP(character, color)
 	highlightList[character] = hl
 end
 
--- ลบ ESP ที่หาย
+-- ลบ ESP ที่หายไป
 local function cleanupESP()
 	for char, hl in pairs(highlightList) do
 		if not char or not char.Parent then
@@ -140,17 +152,17 @@ local function cleanupESP()
 	end
 end
 
--- อัปเดต ESP ทุกๆ 1 วินาที
+-- อัปเดต ESP ทุก 1 วินาที
 task.spawn(function()
 	while true do
 		if espEnabled then
-			for _,plr in pairs(Players:GetPlayers()) do
+			for _, plr in pairs(Players:GetPlayers()) do
 				if plr ~= player and plr.Character then
-					local color = Color3.fromRGB(255, 0, 0)
-					if plr.Team == player.Team then
-						color = Color3.fromRGB(0, 255, 0)
+					if isEnemy(plr) then
+						createESP(plr.Character, Color3.fromRGB(255, 0, 0)) -- ศัตรูแดง
+					else
+						createESP(plr.Character, Color3.fromRGB(0, 255, 0)) -- เพื่อนเขียว
 					end
-					createESP(plr.Character, color)
 				end
 			end
 			cleanupESP()
@@ -159,23 +171,23 @@ task.spawn(function()
 	end
 end)
 
--- ฟังก์ชันหาศัตรูที่ใกล้และมองเห็นได้
+-- ฟังก์ชันหาศัตรูที่ใกล้ที่สุดและมองเห็นได้
 local function getVisibleEnemy()
-	local closest, dist = nil, lockDistance
-	for _,plr in pairs(Players:GetPlayers()) do
-		if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-			if plr.Team ~= player.Team then
-				local hrp = plr.Character.HumanoidRootPart
-				local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
-				if onScreen then
-					local mag = (hrp.Position - camera.CFrame.Position).Magnitude
-					local ray = Ray.new(camera.CFrame.Position, (hrp.Position - camera.CFrame.Position).Unit * mag)
-					local part = workspace:FindPartOnRay(ray, player.Character, false, true)
-					if part and part:IsDescendantOf(plr.Character) then
-						if mag < dist then
-							dist = mag
-							closest = plr
-						end
+	local closest, minDist = nil, lockDistance
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player and isEnemy(plr) and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = plr.Character.HumanoidRootPart
+			local mag = (hrp.Position - camera.CFrame.Position).Magnitude
+			if mag <= lockDistance then
+				local raycastParams = RaycastParams.new()
+				raycastParams.FilterDescendantsInstances = {player.Character}
+				raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+				local result = Workspace:Raycast(camera.CFrame.Position, (hrp.Position - camera.CFrame.Position).Unit * mag, raycastParams)
+				if result and result.Instance and result.Instance:IsDescendantOf(plr.Character) then
+					if mag < minDist then
+						minDist = mag
+						closest = plr
 					end
 				end
 			end
@@ -184,13 +196,14 @@ local function getVisibleEnemy()
 	return closest
 end
 
--- ล็อคเป้าอัตโนมัติ
+-- หมุนกล้องล็อคเป้า
 RunService.RenderStepped:Connect(function()
 	if lockEnabled then
 		local target = getVisibleEnemy()
 		if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
 			currentTarget = target
-			camera.CFrame = CFrame.new(camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
+			local targetPos = target.Character.HumanoidRootPart.Position
+			camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
 		end
 	end
 end)
