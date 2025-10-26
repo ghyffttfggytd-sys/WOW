@@ -1,5 +1,6 @@
 --// Services
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
@@ -8,35 +9,45 @@ local LocalPlayer = Players.LocalPlayer
 local espEnabled = false
 local teamColorEnabled = true
 local highlightList = {}
+local maxDistance = 200
 
---// ฟังก์ชันสร้าง ESP
+--// ฟังก์ชันสร้าง Highlight ติดตัวผู้เล่นตลอด
 local function createESP(player)
-    -- ลบ Highlight เก่าก่อน
     if highlightList[player] then
         highlightList[player]:Destroy()
         highlightList[player] = nil
     end
 
-    if not player.Character then return end
-
     local highlight = Instance.new("Highlight")
-    highlight.Adornee = player.Character
     highlight.FillTransparency = 0.5
     highlight.OutlineTransparency = 0
-    highlight.Parent = workspace
-
-    -- สีตามทีม
-    if teamColorEnabled then
-        if player.Team == LocalPlayer.Team then
-            highlight.FillColor = Color3.fromRGB(0,255,0) -- เพื่อน
-        else
-            highlight.FillColor = Color3.fromRGB(255,0,0) -- ศัตรู
-        end
-    else
-        highlight.FillColor = Color3.fromRGB(255,0,0)
-    end
+    highlight.OutlineColor = Color3.fromRGB(255,255,255)
+    highlight.OutlineThickness = 2
+    highlight.Parent = Workspace
+    highlight.Name = player.Name .. "_ESP"
 
     highlightList[player] = highlight
+
+    local function updateAdornee()
+        if player.Character then
+            highlight.Adornee = player.Character
+            if teamColorEnabled then
+                if player.Team == LocalPlayer.Team then
+                    highlight.FillColor = Color3.fromRGB(0,255,0)
+                else
+                    highlight.FillColor = Color3.fromRGB(255,0,0)
+                end
+            else
+                highlight.FillColor = Color3.fromRGB(255,0,0)
+            end
+        else
+            highlight.Adornee = nil
+        end
+    end
+
+    updateAdornee()
+    player.CharacterAdded:Connect(updateAdornee)
+    player:GetPropertyChangedSignal("Team"):Connect(updateAdornee)
 end
 
 --// ฟังก์ชันลบ ESP
@@ -47,23 +58,12 @@ local function removeESP(player)
     end
 end
 
---// ตรวจจับผู้เล่นและ spawn ใหม่
+--// ตั้งค่า ESP สำหรับผู้เล่น
 local function setupPlayer(player)
-    player.CharacterAdded:Connect(function(character)
-        if espEnabled then
-            createESP(player)
-        end
-    end)
-
-    -- ถ้ามี Character อยู่แล้ว ให้สร้าง ESP
-    if player.Character then
-        if espEnabled then
-            createESP(player)
-        end
-    end
+    createESP(player)
 end
 
---// ตั้งค่า ESP สำหรับผู้เล่นทั้งหมด
+--// สร้าง ESP สำหรับผู้เล่นทั้งหมดที่มีอยู่แล้ว
 for _, player in pairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         setupPlayer(player)
@@ -77,39 +77,70 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
---// อัพเดทสี ESP ทุก 0.5 วินาที
-spawn(function()
-    while true do
-        if espEnabled then
-            for player, highlight in pairs(highlightList) do
-                if player.Character and teamColorEnabled then
-                    if player.Team == LocalPlayer.Team then
-                        highlight.FillColor = Color3.fromRGB(0,255,0)
-                    else
-                        highlight.FillColor = Color3.fromRGB(255,0,0)
-                    end
-                end
+--// ปรับ FillTransparency และ OutlineThickness ตามระยะทุกเฟรม
+RunService.RenderStepped:Connect(function()
+    if espEnabled then
+        local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not localRoot then return end
+        for player, highlight in pairs(highlightList) do
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local distance = (localRoot.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                highlight.FillTransparency = math.clamp(distance / maxDistance, 0.2, 0.8)
+                highlight.OutlineThickness = math.clamp(5 - (distance / maxDistance * 4), 1, 5)
             end
         end
-        wait(0.5)
     end
 end)
 
---// GUI มือถือ (ปุ่มเปิด/ปิด ESP)
+--// GUI มือถือ: พับ/กาง + ลากได้ + ปุ่มเปิด/ปิด ESP
 local screenGui = Instance.new("ScreenGui")
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0,150,0,50)
+mainFrame.Position = UDim2.new(0,20,0,20)
+mainFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- ปุ่มพับ/กาง
+local foldButton = Instance.new("TextButton")
+foldButton.Size = UDim2.new(0,30,0,30)
+foldButton.Position = UDim2.new(1,-35,0,10)
+foldButton.BackgroundColor3 = Color3.fromRGB(100,100,100)
+foldButton.Text = "▲"
+foldButton.TextScaled = true
+foldButton.Parent = mainFrame
+
+-- ปุ่มเปิด/ปิด ESP
 local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0,120,0,50)
-toggleButton.Position = UDim2.new(0,20,0,20)
-toggleButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+toggleButton.Size = UDim2.new(1, -45, 1, 0)
+toggleButton.Position = UDim2.new(0,5,0,0)
+toggleButton.BackgroundColor3 = Color3.fromRGB(70,70,70)
 toggleButton.TextColor3 = Color3.fromRGB(255,255,255)
 toggleButton.Text = "ESP: OFF"
-toggleButton.Parent = screenGui
-toggleButton.AutoButtonColor = true
 toggleButton.TextScaled = true
+toggleButton.Parent = mainFrame
 
+-- ฟังก์ชันพับ/กาง
+local folded = false
+foldButton.MouseButton1Click:Connect(function()
+    folded = not folded
+    if folded then
+        mainFrame.Size = UDim2.new(0,50,0,50)
+        toggleButton.Visible = false
+        foldButton.Text = "▼"
+    else
+        mainFrame.Size = UDim2.new(0,150,0,50)
+        toggleButton.Visible = true
+        foldButton.Text = "▲"
+    end
+end)
+
+-- ฟังก์ชันเปิด/ปิด ESP
 toggleButton.MouseButton1Click:Connect(function()
     espEnabled = not espEnabled
     toggleButton.Text = espEnabled and "ESP: ON" or "ESP: OFF"
@@ -117,7 +148,7 @@ toggleButton.MouseButton1Click:Connect(function()
     if espEnabled then
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer then
-                createESP(player)
+                setupPlayer(player)
             end
         end
     else
