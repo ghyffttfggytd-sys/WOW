@@ -11,7 +11,12 @@ local highlightList = {}
 
 --// ฟังก์ชันสร้าง ESP
 local function createESP(player)
-    if highlightList[player] then return highlightList[player] end
+    -- ลบ Highlight เก่าก่อน
+    if highlightList[player] then
+        highlightList[player]:Destroy()
+        highlightList[player] = nil
+    end
+
     if not player.Character then return end
 
     local highlight = Instance.new("Highlight")
@@ -23,16 +28,15 @@ local function createESP(player)
     -- สีตามทีม
     if teamColorEnabled then
         if player.Team == LocalPlayer.Team then
-            highlight.FillColor = Color3.fromRGB(0,255,0)
+            highlight.FillColor = Color3.fromRGB(0,255,0) -- เพื่อน
         else
-            highlight.FillColor = Color3.fromRGB(255,0,0)
+            highlight.FillColor = Color3.fromRGB(255,0,0) -- ศัตรู
         end
     else
         highlight.FillColor = Color3.fromRGB(255,0,0)
     end
 
     highlightList[player] = highlight
-    return highlight
 end
 
 --// ฟังก์ชันลบ ESP
@@ -43,15 +47,15 @@ local function removeESP(player)
     end
 end
 
---// ตรวจสอบผู้เล่นใหม่และสร้าง ESP
+--// ตรวจจับผู้เล่นและ spawn ใหม่
 local function setupPlayer(player)
-    -- สร้าง ESP เมื่อผู้เล่นมีตัวละคร
     player.CharacterAdded:Connect(function(character)
         if espEnabled then
             createESP(player)
         end
     end)
-    -- ถ้ามีตัวละครแล้วให้สร้าง ESP ทันที
+
+    -- ถ้ามี Character อยู่แล้ว ให้สร้าง ESP
     if player.Character then
         if espEnabled then
             createESP(player)
@@ -59,7 +63,7 @@ local function setupPlayer(player)
     end
 end
 
---// ตั้งค่า ESP สำหรับผู้เล่นทั้งหมดที่มีอยู่
+--// ตั้งค่า ESP สำหรับผู้เล่นทั้งหมด
 for _, player in pairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         setupPlayer(player)
