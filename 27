@@ -1,179 +1,357 @@
---// Services
+-- Admin UI Toolkit (Mobile-friendly)
+-- LocalScript -> put in StarterPlayerScripts or StarterGui
+-- DISCLAIMER: This script DOES NOT implement aim assist / aimbot / cheating.
+-- Use it for admin tools, debugging, or learning in games you own.
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local camera = Workspace.CurrentCamera
+local playerGui = player:WaitForChild("PlayerGui")
 
---// Settings
-local espEnabled = true
-local lockTargetEnabled = true
-local teamColorEnabled = true
-local smoothAimSpeed = 0.15
-local highlightList = {}
+-- ======= Admin list (edit) =======
+local adminList = {
+    ["YourRobloxNameHere"] = true, -- change to your username
+}
 
---// GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "ProESP_UI"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 360)
-mainFrame.Position = UDim2.new(0.02, 0, 0.3, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-mainFrame.BorderSizePixel = 0
-mainFrame.Visible = true
-mainFrame.Parent = gui
-
-local uicorner = Instance.new("UICorner", mainFrame)
-uicorner.CornerRadius = UDim.new(0, 12)
-
-local uiStroke = Instance.new("UIStroke", mainFrame)
-uiStroke.Thickness = 2
-uiStroke.Color = Color3.fromRGB(0, 255, 128)
-
-local title = Instance.new("TextLabel")
-title.Text = "🎯 Pro ESP Controller (Upgraded)"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.TextColor3 = Color3.fromRGB(0, 255, 128)
-title.BackgroundTransparency = 1
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Parent = mainFrame
-
---// Helper Functions
-local function createButton(name, text, pos, func)
-	local button = Instance.new("TextButton")
-	button.Name = name
-	button.Text = text
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 15
-	button.TextColor3 = Color3.new(1,1,1)
-	button.Size = UDim2.new(0.8, 0, 0, 35)
-	button.Position = UDim2.new(0.1,0,pos,0)
-	button.BackgroundColor3 = Color3.fromRGB(40,40,40)
-	button.Parent = mainFrame
-	
-	local corner = Instance.new("UICorner", button)
-	corner.CornerRadius = UDim.new(0,8)
-	
-	button.MouseButton1Click:Connect(func)
-	button.MouseEnter:Connect(function() button.BackgroundColor3 = Color3.fromRGB(0,200,120) end)
-	button.MouseLeave:Connect(function() button.BackgroundColor3 = Color3.fromRGB(40,40,40) end)
+-- Only create UI if player is admin
+if not adminList[player.Name] then
+    return
 end
 
---// ESP Functions
-local function addESP(target)
-	if target == nil or target:FindFirstChild("HumanoidRootPart") == nil then return end
-	if highlightList[target] then return end -- มีแล้ว
-
-	local highlight = Instance.new("Highlight")
-	highlight.Adornee = target
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.FillTransparency = 0.7
-	highlight.OutlineTransparency = 0
-	highlight.Parent = target
-
-	-- สีตามทีม
-	if teamColorEnabled and player.Team and Players:GetPlayerFromCharacter(target) then
-		if player.Team == Players:GetPlayerFromCharacter(target).Team then
-			highlight.FillColor = Color3.fromRGB(0,255,0)
-		else
-			highlight.FillColor = Color3.fromRGB(255,0,0)
-		end
-	else
-		highlight.FillColor = Color3.fromRGB(255,255,0)
-	end
-
-	highlightList[target] = highlight
+-- ======= Helper funcs =======
+local function create(className, props)
+    local obj = Instance.new(className)
+    if props then
+        for k,v in pairs(props) do obj[k] = v end
+    end
+    return obj
 end
 
-local function removeESP(target)
-	if highlightList[target] then
-		highlightList[target]:Destroy()
-		highlightList[target] = nil
-	end
+-- ======= Create GUI =======
+local screenGui = create("ScreenGui", {Name = "AdminToolkitUI", ResetOnSpawn = false, Parent = playerGui})
+
+local frame = create("Frame", {
+    Name = "MainFrame",
+    Size = UDim2.new(0, 260, 0, 180),
+    Position = UDim2.new(0.5, -130, 0.7, -90),
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    BackgroundTransparency = 0.15,
+    BackgroundColor3 = Color3.fromRGB(30,30,30),
+    Parent = screenGui,
+})
+
+-- Title bar (drag handle)
+local title = create("TextLabel", {
+    Name = "TitleBar",
+    Size = UDim2.new(1, 0, 0, 36),
+    Position = UDim2.new(0,0,0,0),
+    BackgroundTransparency = 0.4,
+    BackgroundColor3 = Color3.fromRGB(20,20,20),
+    Text = "Admin Toolkit",
+    TextColor3 = Color3.fromRGB(255,255,255),
+    Font = Enum.Font.SourceSansBold,
+    TextSize = 18,
+    Parent = frame,
+})
+
+-- Collapse button
+local collapseBtn = create("TextButton", {
+    Name = "CollapseBtn",
+    Size = UDim2.new(0, 36, 0, 28),
+    Position = UDim2.new(1, -40, 0, 4),
+    AnchorPoint = Vector2.new(1,0),
+    Text = "—",
+    Font = Enum.Font.SourceSansBold,
+    TextSize = 20,
+    BackgroundTransparency = 0.6,
+    Parent = title,
+})
+
+-- Content area
+local content = create("Frame", {
+    Name = "Content",
+    Size = UDim2.new(1, -10, 1, -46),
+    Position = UDim2.new(0, 5, 0, 40),
+    BackgroundTransparency = 1,
+    Parent = frame,
+})
+
+-- Resize handle (bottom-right)
+local resizeGrip = create("ImageLabel", {
+    Name = "ResizeGrip",
+    Size = UDim2.new(0, 18, 0, 18),
+    Position = UDim2.new(1, -20, 1, -20),
+    AnchorPoint = Vector2.new(1,1),
+    BackgroundTransparency = 0.5,
+    Image = "rbxassetid://707271671", -- small grip image (fallback)
+    Parent = frame,
+})
+
+-- Row helper
+local function createRow(y, text)
+    local lbl = create("TextLabel", {
+        Size = UDim2.new(0.6, -8, 0, 28),
+        Position = UDim2.new(0, 8, 0, y),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = Color3.fromRGB(220,220,220),
+        Font = Enum.Font.SourceSans,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = content,
+    })
+    return lbl
 end
 
-local function updateESP()
-	for _, p in pairs(Players:GetPlayers()) do
-		if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-			if espEnabled then
-				addESP(p.Character)
-			else
-				removeESP(p.Character)
-			end
-		end
-	end
+-- Toggle helper
+local function createToggle(x,y,initial)
+    local btn = create("TextButton", {
+        Size = UDim2.new(0, 72, 0, 28),
+        Position = UDim2.new(0, x, 0, y),
+        BackgroundColor3 = Color3.fromRGB(70,70,70),
+        TextColor3 = Color3.fromRGB(255,255,255),
+        Font = Enum.Font.SourceSansBold,
+        TextSize = 14,
+        Parent = content,
+    })
+    btn.Active = true
+    btn.Text = initial and "ON" or "OFF"
+    btn.BackgroundColor3 = initial and Color3.fromRGB(0,150,0) or Color3.fromRGB(100,0,0)
+    return btn
 end
 
---// Lock Target Functions
-local function getClosestEnemy()
-	local closestDist, closestEnemy = math.huge, nil
-	for _, p in pairs(Players:GetPlayers()) do
-		if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-			if player.Team and p.Team == player.Team then continue end
-			local pos, onScreen = camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
-			if onScreen then
-				local dist = (Vector2.new(pos.X,pos.Y) - UserInputService:GetMouseLocation()).Magnitude
-				if dist < closestDist then
-					closestDist = dist
-					closestEnemy = p
-				end
-			end
-		end
-	end
-	return closestEnemy
+-- Slider UI (simple)
+local function createSlider(x,y, minVal, maxVal, startVal)
+    local track = create("Frame", {
+        Size = UDim2.new(0, 140, 0, 20),
+        Position = UDim2.new(0, x, 0, y),
+        BackgroundColor3 = Color3.fromRGB(60,60,60),
+        Parent = content,
+    })
+    local knob = create("Frame", {
+        Size = UDim2.new(0, 12, 1, 0),
+        Position = UDim2.new((startVal-minVal)/(maxVal-minVal), 0, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(200,200,200),
+        Parent = track,
+    })
+    return track, knob
 end
 
-RunService.RenderStepped:Connect(function()
-	updateESP()
-	if lockTargetEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-		local target = getClosestEnemy()
-		if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-			-- Smooth Aim
-			local targetCFrame = CFrame.new(camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
-			camera.CFrame = camera.CFrame:Lerp(targetCFrame, smoothAimSpeed)
-		end
-	end
+-- Build UI elements
+createRow(4, "Aim Assist (placeholder)")
+local aimToggle = createToggle(0.6, 4, false)
+
+createRow(40, "FOV Size")
+local fovTrack, fovKnob = createSlider(0.4, 40, 10, 180, 60) -- default FOV var: 60
+
+createRow(76, "Show Player Labels")
+local labelsToggle = createToggle(0.6, 76, false)
+
+-- Display current fov numeric
+local fovValLabel = create("TextLabel", {
+    Size = UDim2.new(0, 48, 0, 20),
+    Position = UDim2.new(1, -56, 0, 40),
+    BackgroundTransparency = 1,
+    Text = "60",
+    TextColor3 = Color3.fromRGB(230,230,230),
+    Font = Enum.Font.SourceSansBold,
+    TextSize = 14,
+    Parent = content,
+})
+
+-- ======= Interactivity: Dragging (supports touch + mouse) =======
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function updateFramePosition(input)
+    local delta = input.Position - dragStart
+    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        dragInput = input
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
 end)
 
---// Buttons
-createButton("ToggleESP","🔵 Toggle ESP",0.15,function()
-	espEnabled = not espEnabled
-	updateESP()
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateFramePosition(input)
+    end
 end)
 
-createButton("ToggleLock","🎯 Toggle Lock Target",0.3,function()
-	lockTargetEnabled = not lockTargetEnabled
+-- ======= Resize handling =======
+local resizing = false
+local resizeStart, startSize
+
+resizeGrip.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        resizing = true
+        resizeStart = input.Position
+        startSize = frame.Size
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                resizing = false
+            end
+        end)
+    end
 end)
 
-createButton("ToggleTeam","🟢 Toggle Team Color",0.45,function()
-	teamColorEnabled = not teamColorEnabled
-	updateESP()
+UserInputService.InputChanged:Connect(function(input)
+    if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - resizeStart
+        local newX = math.clamp(startSize.X.Offset + delta.X, 180, 800)
+        local newY = math.clamp(startSize.Y.Offset + delta.Y, 120, 600)
+        frame.Size = UDim2.new(0, newX, 0, newY)
+    end
 end)
 
-createButton("CloseUI","❌ Close / Hide UI (Press P)",0.6,function()
-	mainFrame.Visible = false
+-- ======= Collapse/Expand =======
+local collapsed = false
+collapseBtn.MouseButton1Click:Connect(function()
+    collapsed = not collapsed
+    if collapsed then
+        content.Visible = false
+        frame.Size = UDim2.new(frame.Size.X.Scale, frame.Size.X.Offset, 0, 40)
+        collapseBtn.Text = "+"
+    else
+        content.Visible = true
+        frame.Size = UDim2.new(frame.Size.X.Scale, frame.Size.X.Offset, 0, 180)
+        collapseBtn.Text = "—"
+    end
 end)
 
---// Toggle UI
-UserInputService.InputBegan:Connect(function(input, processed)
-	if processed then return end
-	if input.KeyCode == Enum.KeyCode.P then
-		mainFrame.Visible = not mainFrame.Visible
-	end
+-- ======= Toggle behavior =======
+local aimEnabled = false
+aimToggle.MouseButton1Click:Connect(function()
+    aimEnabled = not aimEnabled
+    aimToggle.Text = aimEnabled and "ON" or "OFF"
+    aimToggle.BackgroundColor3 = aimEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(100,0,0)
+
+    -- NOTE: This is only a placeholder flag. Do NOT use it to implement cheats in other people's games.
+    if aimEnabled then
+        print("Aim Assist flag enabled (placeholder). Implement real logic only in your own game.")
+    else
+        print("Aim Assist flag disabled.")
+    end
 end)
 
---// Auto-add ESP for players joining
-Players.PlayerAdded:Connect(function(p)
-	p.CharacterAdded:Connect(function(c)
-		if espEnabled then addESP(c) end
-	end)
+-- ======= Slider logic (drag to change FOV value) =======
+local sliderDragging = false
+local sliderInput, sliderStartPos, knobStartPos
+local minFOV, maxFOV = 10, 180
+local curFOV = 60
+
+local function updateSlider(input, track, knob)
+    local trackPos = track.AbsolutePosition.X
+    local trackSize = track.AbsoluteSize.X
+    local relative = math.clamp((input.Position.X - trackPos) / trackSize, 0, 1)
+    knob.Position = UDim2.new(relative, 0, 0, 0)
+    curFOV = math.floor(minFOV + (maxFOV-minFOV) * relative + 0.5)
+    fovValLabel.Text = tostring(curFOV)
+    -- Store this variable to use in your own game logic
+end
+
+fovTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        sliderDragging = true
+        sliderInput = input
+        updateSlider(input, fovTrack, fovKnob)
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                sliderDragging = false
+            end
+        end)
+    end
 end)
-Players.PlayerRemoving:Connect(function(p)
-	if p.Character then removeESP(p.Character) end
+
+UserInputService.InputChanged:Connect(function(input)
+    if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateSlider(input, fovTrack, fovKnob)
+    end
 end)
+
+-- ======= Show Player Labels (safe example of "see players") =======
+local labelsOn = false
+local createdLabels = {} -- player -> BillboardGui
+
+local function createLabelForCharacter(char, playerObj)
+    if not char or not playerObj then return end
+    if createdLabels[playerObj] then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+    local bg = Instance.new("BillboardGui")
+    bg.Name = "AdminNameTag"
+    bg.Adornee = head
+    bg.Size = UDim2.new(0,120,0,30)
+    bg.StudsOffset = Vector3.new(0,1.2,0)
+    bg.AlwaysOnTop = true
+    bg.Parent = head
+
+    local txt = Instance.new("TextLabel", bg)
+    txt.Size = UDim2.new(1,0,1,0)
+    txt.BackgroundTransparency = 1
+    txt.Text = playerObj.Name
+    txt.TextColor3 = Color3.fromRGB(255,255,255)
+    txt.Font = Enum.Font.SourceSansBold
+    txt.TextSize = 14
+
+    createdLabels[playerObj] = bg
+end
+
+local function removeLabelForPlayer(playerObj)
+    local g = createdLabels[playerObj]
+    if g and g.Parent then
+        g:Destroy()
+    end
+    createdLabels[playerObj] = nil
+end
+
+local function refreshLabels(enable)
+    labelsOn = enable
+    if labelsOn then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player and p.Character then
+                createLabelForCharacter(p.Character, p)
+            end
+            -- connect future spawns
+            p.CharacterAdded:Connect(function(char)
+                if labelsOn and p ~= player then
+                    wait(0.1)
+                    createLabelForCharacter(char, p)
+                end
+            end)
+        end
+    else
+        for p,_ in pairs(createdLabels) do
+            removeLabelForPlayer(p)
+        end
+    end
+end
+
+labelsToggle.MouseButton1Click:Connect(function()
+    local new = not labelsOn
+    labelsToggle.Text = new and "ON" or "OFF"
+    labelsToggle.BackgroundColor3 = new and Color3.fromRGB(0,150,0) or Color3.fromRGB(100,0,0)
+    refreshLabels(new)
+end)
+
+-- Clean up on leave
+Players.PlayerRemoving:Connect(function(plr)
+    removeLabelForPlayer(plr)
+end)
+
+-- initial value
+fovValLabel.Text = tostring(curFOV)
+
+print("Admin UI loaded for", player.Name)
